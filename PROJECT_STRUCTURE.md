@@ -69,7 +69,7 @@ Plugin metadata for Obsidian:
   "version": "semver",
   "minAppVersion": "minimum Obsidian version",
   "description": "Short description",
-  "author": "Your name",
+  "author": "brunoleos",
   "authorUrl": "Your website/GitHub",
   "isDesktopOnly": false
 }

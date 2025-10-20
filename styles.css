@@ -1,0 +1,38 @@
+/* Dynamic Tag Renderer Plugin Styles */
+
+.dynamic-tag-container {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.dynamic-tag-error {
+    color: var(--text-error);
+    font-style: italic;
+    padding: 2px 6px;
+    background-color: var(--background-modifier-error);
+    border-radius: 4px;
+}
+
+.dynamic-tag-mapping {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background-color: var(--background-secondary);
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.dynamic-tag-mapping .setting-item-control {
+    flex-grow: 1;
+    display: flex;
+    gap: 8px;
+}
+
+.dynamic-tag-mapping input[type="text"]:first-of-type {
+    width: 150px;
+}
+
+.dynamic-tag-mapping input[type="text"]:nth-of-type(2) {
+    flex-grow: 1;
+}

@@ -6,10 +6,10 @@
 }
 
 .dynamic-tag-error {
-    color: var(--text-error);
+    color: #b00020; /* dark red for text */
     font-style: italic;
     padding: 2px 6px;
-    background-color: var(--background-modifier-error);
+    background-color: #ffeaea; /* light red for background */
     border-radius: 4px;
 }
 

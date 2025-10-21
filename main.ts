@@ -6,13 +6,22 @@ import {
     MarkdownView,
     MarkdownPostProcessorContext,
     EditorView,
-    Notice
+    Notice,
+    TFile
 } from 'obsidian';
 
 interface TagScriptMapping {
     tag: string;
     scriptPath: string;
     enabled: boolean;
+}
+
+interface ScriptContext {
+    app: App;
+    tag: string;
+    element: HTMLElement;
+    sourcePath: string;
+    frontmatter: any;
 }
 
 interface DynamicTagRendererSettings {
@@ -91,15 +100,12 @@ export default class DynamicTagRendererPlugin extends Plugin {
     ) {
         // Find all tag elements in the markdown
         const tagElements = element.findAll('a.tag');
-
         for (const tagEl of tagElements) {
             const tagText = tagEl.getAttribute('data-tag-name') || tagEl.textContent?.replace('#', '');
-            
             if (!tagText) continue;
-
-            // Find matching mapping for this tag
+            // Case-insensitive tag matching
             const mapping = this.settings.tagMappings.find(
-                m => m.enabled && m.tag === tagText
+                m => m.enabled && m.tag.toLowerCase() === tagText.toLowerCase()
             );
 
             if (mapping) {
@@ -119,9 +125,9 @@ export default class DynamicTagRendererPlugin extends Plugin {
             
             // Create a container for the rendered content
             const container = createDiv({ cls: 'dynamic-tag-container' });
-            
+
             // Prepare context for the script
-            const scriptContext = {
+            const scriptContext: ScriptContext = {
                 app: this.app,
                 tag: mapping.tag,
                 element: container,
@@ -131,22 +137,27 @@ export default class DynamicTagRendererPlugin extends Plugin {
 
             // Execute the render function
             const result = await renderFunction(scriptContext);
-
-            // If the function returns an element or string, render it
-            if (result) {
-                if (typeof result === 'string') {
-                    container.innerHTML = result;
-                } else if (result instanceof HTMLElement) {
-                    container.appendChild(result);
-                }
+            // Output validation and fallback
+            if (result === null || result === undefined) {
+                // Show original tag if script returns nothing
+                container.appendChild(tagEl.cloneNode(true));
+            } else if (typeof result === 'string') {
+                container.innerHTML = result;
+            } else if (result instanceof HTMLElement) {
+                container.appendChild(result);
+            } else {
+                // Show error if output type is invalid
+                const errorEl = createSpan({
+                    cls: 'dynamic-tag-error',
+                    text: `[Invalid output for #${mapping.tag}]`
+                });
+                container.appendChild(errorEl);
             }
-
-            // Replace the original tag with the rendered content
             tagEl.replaceWith(container);
             
         } catch (error) {
             console.error(`Error rendering tag #${mapping.tag}:`, error);
-            const errorEl = createSpan({ 
+            const errorEl = createSpan({
                 cls: 'dynamic-tag-error',
                 text: `[Error rendering #${mapping.tag}]`
             });
@@ -163,8 +174,8 @@ export default class DynamicTagRendererPlugin extends Plugin {
         // Load the script file
         const file = this.app.vault.getAbstractFileByPath(scriptPath);
         
-        if (!file || file.children) {
-            throw new Error(`Script file not found: ${scriptPath}`);
+        if (!file || !(file instanceof TFile)) {
+            throw new Error(`Script file not found or not a file: ${scriptPath}`);
         }
 
         const scriptContent = await this.app.vault.read(file);

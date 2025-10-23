@@ -16,7 +16,7 @@ function render(context) {
     `;
     
     button.addEventListener('click', () => {
-        new context.app.Notice(`Hello from #${context.tag}! 👋`);
+        new context.Notice(`Hello from #${context.tag}! 👋`);
     });
     
     return button;

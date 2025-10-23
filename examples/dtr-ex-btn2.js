@@ -54,7 +54,7 @@ async function render(context) {
             }
         }
         
-        new context.app.Notice(
+        new context.Notice(
             `Tag #${context.tag} appears in ${count} note${count !== 1 ? 's' : ''}`
         );
         
@@ -63,7 +63,7 @@ async function render(context) {
         if (searchPlugin?.instance?.openGlobalSearch) {
             searchPlugin.instance.openGlobalSearch(`tag:#${context.tag}`);
         } else {
-            new context.app.Notice('Global search plugin not available');
+            new context.Notice('Global search plugin not available');
         }
     });
     

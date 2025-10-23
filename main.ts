@@ -5,7 +5,6 @@ import {
     Setting,
     MarkdownView,
     MarkdownPostProcessorContext,
-    EditorView,
     Notice,
     TFile
 } from 'obsidian';
@@ -22,6 +21,7 @@ interface ScriptContext {
     element: HTMLElement;
     sourcePath: string;
     frontmatter: any;
+    Notice: typeof Notice;
 }
 
 interface DynamicTagRendererSettings {
@@ -132,7 +132,8 @@ export default class DynamicTagRendererPlugin extends Plugin {
                 tag: mapping.tag,
                 element: container,
                 sourcePath: context.sourcePath,
-                frontmatter: context.frontmatter
+                frontmatter: context.frontmatter,
+                Notice: Notice
             };
 
             // Execute the render function
@@ -186,13 +187,14 @@ export default class DynamicTagRendererPlugin extends Plugin {
             // Wrap in async function to support await
             const wrappedScript = `
                 return (async function(context) {
+                    const Notice = context.Notice;
                     ${scriptContent}
-                    
+
                     // If render function is defined, call it
                     if (typeof render === 'function') {
                         return await render(context);
                     }
-                    
+
                     throw new Error('No render() function found in script');
                 });
             `;
@@ -213,7 +215,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
         if (view) {
             // Force re-render by switching modes
             const currentMode = view.getMode();
-            if (currentMode === 'preview' || currentMode === 'reading') {
+            if (currentMode === 'preview') {
                 view.previewMode.rerender(true);
             }
         }

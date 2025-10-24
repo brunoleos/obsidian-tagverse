@@ -49,3 +49,8 @@ span.dynamic-tag-container + .cm-widgetBuffer {
 .dynamic-tag-mapping input[type="text"]:nth-of-type(2) {
     flex-grow: 1;
 }
+
+/* Mark decoration style (for plain text display when cursor is inside or in source mode) */
+.dynamic-tag-inline-mark {
+    /* Inherit normal hashtag styling */
+}

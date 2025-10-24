@@ -8,9 +8,63 @@ import {
     Notice,
     TFile
 } from 'obsidian';
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, MatchDecorator } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
-import { RangeSetBuilder } from '@codemirror/state';
+import { RangeSetBuilder, StateField } from '@codemirror/state';
+
+// ========== LOGGING UTILITY ==========
+class Logger {
+    private prefix = '[DTR]';
+    private enabled = true;
+
+    private formatMessage(component: string, event: string, data?: any): string {
+        const timestamp = new Date().toISOString().split('T')[1];
+        const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
+        return `${this.prefix} ${timestamp} | ${component} | ${event}${dataStr}`;
+    }
+
+    init(message: string, data?: any) {
+        if (this.enabled) console.log(this.formatMessage('INIT', message, data));
+    }
+
+    debug(component: string, event: string, data?: any) {
+        if (this.enabled) console.log(this.formatMessage(component, event, data));
+    }
+
+    info(component: string, event: string, data?: any) {
+        if (this.enabled) console.info(this.formatMessage(component, event, data));
+    }
+
+    warn(component: string, event: string, data?: any) {
+        if (this.enabled) console.warn(this.formatMessage(component, event, data));
+    }
+
+    error(component: string, event: string, error: any) {
+        if (this.enabled) console.error(this.formatMessage(component, event, { error: error.message || error }));
+    }
+
+    logModeChange(from: string, to: string) {
+        this.info('MODE', 'Changed', { from, to });
+    }
+
+    logTagDecision(tag: string, decision: string, reason: string, details?: any) {
+        this.debug('MATCH', 'Decision', { tag, decision, reason, ...details });
+    }
+
+    logUserAction(action: string, details?: any) {
+        this.info('USER', action, details);
+    }
+
+    logSettings(mappings: TagScriptMapping[]) {
+        this.init('Settings loaded', { mappingCount: mappings.length });
+        mappings.forEach((m, i) => {
+            this.init(`Mapping[${i}]`, { tag: m.tag, script: m.scriptPath, enabled: m.enabled });
+        });
+    }
+}
+
+const logger = new Logger();
+// ========================================
 
 interface TagScriptMapping {
     tag: string;
@@ -49,6 +103,7 @@ class DynamicTagWidget extends WidgetType {
         private frontmatter: any
     ) {
         super();
+        logger.debug('WIDGET', 'Created', { tag: this.tag, script: this.mapping.scriptPath, source: this.sourcePath });
         this.container = createSpan({ cls: 'dynamic-tag-container' });
         this.container.innerHTML = `Loading #${this.tag}...`;
     }
@@ -58,6 +113,7 @@ class DynamicTagWidget extends WidgetType {
     }
 
     toDOM(): HTMLElement {
+        logger.debug('WIDGET', 'toDOM called', { tag: this.tag, rendered: this.rendered });
         if (!this.rendered) {
             this.renderContent();
         }
@@ -68,8 +124,11 @@ class DynamicTagWidget extends WidgetType {
         if (this.rendered) return;
         this.rendered = true;
 
+        logger.debug('WIDGET', 'Rendering content', { tag: this.tag, script: this.mapping.scriptPath });
+
         try {
             const renderFunction = await this.plugin.loadScript(this.mapping.scriptPath);
+            logger.debug('WIDGET', 'Script loaded', { tag: this.tag, script: this.mapping.scriptPath });
 
             // Create a temporary container for the script to render into
             const tempContainer = createSpan();
@@ -84,6 +143,7 @@ class DynamicTagWidget extends WidgetType {
             };
 
             const result = await renderFunction(scriptContext);
+            logger.debug('WIDGET', 'Script executed', { tag: this.tag, resultType: typeof result });
 
             // Clear any content added by the script
             this.container!.innerHTML = '';
@@ -91,12 +151,16 @@ class DynamicTagWidget extends WidgetType {
             // Output validation and fallback
             if (result === null || result === undefined) {
                 this.container!.innerHTML = `#${this.tag}`;
+                logger.debug('WIDGET', 'Output: null/undefined - showing plain tag', { tag: this.tag });
             } else if (typeof result === 'string') {
                 this.container!.innerHTML = result;
+                logger.debug('WIDGET', 'Output: string HTML', { tag: this.tag, length: result.length });
             } else if (result instanceof HTMLElement) {
                 this.container!.appendChild(result);
+                logger.debug('WIDGET', 'Output: HTMLElement', { tag: this.tag, element: result.tagName });
             } else {
                 this.container!.innerHTML = `[Invalid output for #${this.mapping.tag}]`;
+                logger.warn('WIDGET', 'Invalid output type', { tag: this.tag, type: typeof result });
             }
 
             // Ensure the container displays inline and doesn't break the line
@@ -104,9 +168,14 @@ class DynamicTagWidget extends WidgetType {
             this.container!.style.verticalAlign = 'baseline';
             this.container!.style.margin = '0 2px';
 
+            logger.debug('WIDGET', 'Rendering complete', { tag: this.tag, finalHTML: this.container!.outerHTML.substring(0, 100) });
+
         } catch (error) {
-            console.error(`Error rendering tag #${this.mapping.tag}:`, error);
-            this.container!.innerHTML = `[Error rendering #${this.mapping.tag}]`;
+            logger.error('WIDGET', 'Rendering failed', error);
+            this.plugin.app.workspace.onLayoutReady(() => {
+                new Notice(`Error rendering tag #${this.mapping.tag}: ${error.message}`);
+            });
+            this.container!.innerHTML = `[Error: #${this.mapping.tag}]`;
         }
     }
 }
@@ -116,91 +185,50 @@ export let DynamicTagRendererPluginInstance: DynamicTagRendererPlugin | null = n
 export default class DynamicTagRendererPlugin extends Plugin {
     settings: DynamicTagRendererSettings;
     private scriptCache: Map<string, Function> = new Map();
-    private livePreviewObserver: MutationObserver | null = null;
 
-    private dynamicTagPlugin = ViewPlugin.fromClass(class {
-        decorations: DecorationSet;
-        private plugin: DynamicTagRendererPlugin;
 
-        constructor(view: EditorView) {
-            this.plugin = this.getPluginInstance(view);
-            this.decorations = this.buildDecorations(view);
-        }
-
-        private getPluginInstance(view: EditorView): DynamicTagRendererPlugin {
-            // Use the global instance
-            return DynamicTagRendererPluginInstance!;
-        }
-
-        update(update: ViewUpdate) {
-            if (update.docChanged || update.viewportChanged) {
-                this.decorations = this.buildDecorations(update.view);
-            }
-        }
-
-        buildDecorations(view: EditorView): DecorationSet {
-            const builder = new RangeSetBuilder<Decoration>();
-
-            if (!this.plugin || !this.plugin.settings) return builder.finish();
-
-            const doc = view.state.doc;
-            const text = doc.toString();
-
-            // Find all #tag patterns
-            const tagRegex = /#([a-zA-Z0-9_-]+)/g;
-            let match;
-            while ((match = tagRegex.exec(text)) !== null) {
-                const tag = match[1];
-                const mapping = this.plugin.settings.tagMappings.find(
-                    m => m.enabled && m.tag.toLowerCase() === tag.toLowerCase()
-                );
-
-                if (mapping) {
-                    const start = match.index;
-                    const end = start + match[0].length;
-
-                    // Get frontmatter from the file
-                    const file = this.plugin.app.workspace.getActiveFile();
-                    let frontmatter = {};
-                    if (file) {
-                        const cache = this.plugin.app.metadataCache.getFileCache(file);
-                        frontmatter = cache?.frontmatter || {};
-                    }
-
-                    const decoration = Decoration.replace({
-                        widget: new DynamicTagWidget(this.plugin, tag, mapping, file?.path || '', frontmatter),
-                        block: false
-                    });
-
-                    builder.add(start, end, decoration);
-                }
-            }
-
-            return builder.finish();
-        }
-    }, {
-        decorations: v => v.decorations
-    });
 
     async onload() {
+        logger.init('Plugin loading...');
         DynamicTagRendererPluginInstance = this;
         await this.loadSettings();
 
         // Register markdown post processor for reading mode
         this.registerMarkdownPostProcessor(this.processMarkdown.bind(this));
+        logger.debug('INIT', 'Registered markdown post processor');
 
-        // Register CodeMirror plugin for source mode
-        this.registerEditorExtension(this.dynamicTagPlugin);
-
-        // Register live preview processor
+        // Register live preview processor (source mode will show plain text)
         this.registerLivePreviewProcessor();
+        logger.debug('INIT', 'Registered live preview processor');
 
         // Register event for file changes if enabled
         this.registerEvent(
-            this.app.workspace.on('file-open', () => {
+            this.app.workspace.on('file-open', (file) => {
+                logger.info('WORKSPACE', 'File opened', { path: file?.path });
                 if (this.settings.refreshOnFileChange) {
                     this.refreshActiveView();
                 }
+            })
+        );
+
+        // Register workspace event for active leaf changes
+        this.registerEvent(
+            this.app.workspace.on('active-leaf-change', (leaf) => {
+                if (leaf && leaf.view.getViewType() === 'markdown') {
+                    const view = leaf.view as MarkdownView;
+                    const mode = view.getMode();
+                    logger.info('WORKSPACE', 'Active leaf changed', { 
+                        viewType: view.getViewType(), 
+                        mode: mode 
+                    });
+                }
+            })
+        );
+
+        // Register workspace event for layout changes
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                logger.info('WORKSPACE', 'Layout changed');
             })
         );
 
@@ -212,6 +240,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
             id: 'refresh-dynamic-tags',
             name: 'Refresh dynamic tags in current note',
             callback: () => {
+                logger.logUserAction('Command: Refresh dynamic tags');
                 this.refreshActiveView();
                 new Notice('Dynamic tags refreshed');
             }
@@ -222,25 +251,24 @@ export default class DynamicTagRendererPlugin extends Plugin {
             id: 'clear-script-cache',
             name: 'Clear script cache',
             callback: () => {
+                logger.logUserAction('Command: Clear script cache');
                 this.scriptCache.clear();
                 new Notice('Script cache cleared');
             }
         });
 
-        console.log('Dynamic Tag Renderer plugin loaded');
+        logger.init('Plugin loaded successfully');
     }
 
     onunload() {
         DynamicTagRendererPluginInstance = null;
-        if (this.livePreviewObserver) {
-            this.livePreviewObserver.disconnect();
-        }
         this.scriptCache.clear();
-        console.log('Dynamic Tag Renderer plugin unloaded');
+        // Plugin unloaded successfully
     }
 
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        logger.logSettings(this.settings.tagMappings);
     }
 
     async saveSettings() {
@@ -253,18 +281,28 @@ export default class DynamicTagRendererPlugin extends Plugin {
         element: HTMLElement,
         context: MarkdownPostProcessorContext
     ) {
+        logger.debug('READING', 'Processing markdown', { sourcePath: context.sourcePath });
+        
         // Find all tag elements in the markdown
         const tagElements = element.findAll('a.tag');
+        logger.debug('READING', 'Tags found', { count: tagElements.length });
+        
         for (const tagEl of tagElements) {
             const tagText = tagEl.getAttribute('data-tag-name') || tagEl.textContent?.replace('#', '');
             if (!tagText) continue;
+            
+            logger.debug('READING', 'Processing tag', { tag: tagText });
+            
             // Case-insensitive tag matching
             const mapping = this.settings.tagMappings.find(
                 m => m.enabled && m.tag.toLowerCase() === tagText.toLowerCase()
             );
 
             if (mapping) {
+                logger.debug('READING', 'Mapping found', { tag: tagText, script: mapping.scriptPath });
                 await this.renderDynamicTag(tagEl, mapping, context);
+            } else {
+                logger.debug('READING', 'No mapping found', { tag: tagText });
             }
         }
     }
@@ -321,10 +359,11 @@ export default class DynamicTagRendererPlugin extends Plugin {
             tagEl.replaceWith(container);
 
         } catch (error) {
-            console.error(`Error rendering tag #${mapping.tag}:`, error);
+            // Use Notice for user feedback instead of console.error
+            new Notice(`Error rendering tag #${mapping.tag}: ${error.message}`);
             const errorEl = createSpan({
                 cls: 'dynamic-tag-error',
-                text: `[Error rendering #${mapping.tag}]`
+                text: `[Error: #${mapping.tag}]`
             });
             tagEl.replaceWith(errorEl);
         }
@@ -370,183 +409,196 @@ export default class DynamicTagRendererPlugin extends Plugin {
 
             return scriptFunction;
         } catch (error) {
-            throw new Error(`Failed to load script ${scriptPath}: ${error.message}`);
+            // Provide more detailed error information
+            throw new Error(`Failed to load script "${scriptPath}": ${error.message}`);
         }
     }
 
     private registerLivePreviewProcessor() {
-        // Use MutationObserver to watch for hashtag elements in Live Preview
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const element = node as HTMLElement;
-                            this.processLivePreviewHashtags(element);
-                        }
+        // Helper function to check if editor is in live preview mode (EXACT Jira plugin pattern)
+        const isEditorInLivePreviewMode = (view: EditorView) => 
+            view.state.field(editorLivePreviewField as unknown as StateField<boolean>);
+
+        // Helper functions for cursor position detection (EXACT Jira plugin pattern)
+        const isCursorInsideTag = (view: EditorView, start: number, length: number) => {
+            const cursor = view.state.selection.main.head;
+            return (cursor > start - 1 && cursor < start + length + 1);
+        };
+
+        const isSelectionContainsTag = (view: EditorView, start: number, length: number) => {
+            const selectionBegin = view.state.selection.main.from;
+            const selectionEnd = view.state.selection.main.to;
+            return (selectionEnd > start - 1 && selectionBegin < start + length + 1);
+        };
+
+        // Create MatchDecorator for live preview hashtag replacement
+        const tagMatchDecorator = new MatchDecorator({
+            regexp: /#([a-zA-Z0-9_-]+)/g,
+            decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {
+                const tag = match[1];
+                const tagLength = match[0].length;
+                const cursor = view.state.selection.main.head;
+
+                logger.debug('MATCH', 'Tag found', { tag, pos, length: tagLength, cursor });
+
+                // Check mode
+                const isLivePreview = isEditorInLivePreviewMode(view);
+                logger.debug('MATCH', 'Mode check', { tag, isLivePreview });
+
+                // Check cursor position
+                const cursorInside = isCursorInsideTag(view, pos, tagLength);
+                const selectionContains = isSelectionContainsTag(view, pos, tagLength);
+                logger.debug('MATCH', 'Cursor check', { tag, cursorInside, selectionContains, cursor, start: pos, end: pos + tagLength });
+
+                // Check if this tag has a mapping
+                const mapping = this.settings.tagMappings.find(
+                    m => m.enabled && m.tag.toLowerCase() === tag.toLowerCase()
+                );
+
+                // When cursor is inside or selection contains tag (in live preview), show natively
+                if (isLivePreview && (cursorInside || selectionContains)) {
+                    const reason = cursorInside ? 'cursor inside' : 'selection contains';
+                    logger.logTagDecision(tag, 'NULL', reason + ' (show natively)', { pos, cursor });
+                    return null; // Let Obsidian handle natively - no decoration
+                }
+
+                // In live preview with cursor outside: show widgets for mapped tags
+                if (mapping) {
+                    logger.logTagDecision(tag, 'REPLACE', 'widget', { pos, script: mapping.scriptPath });
+                    
+                    // Get frontmatter from the current file
+                    const file = this.app.workspace.getActiveFile();
+                    let frontmatter = {};
+                    if (file) {
+                        const cache = this.app.metadataCache.getFileCache(file);
+                        frontmatter = cache?.frontmatter || {};
+                    }
+
+                    return Decoration.replace({
+                        widget: new DynamicTagWidget(this, tag, mapping, file?.path || '', frontmatter),
                     });
                 }
-            });
-        });
 
-        // Store reference for cleanup
-        this.livePreviewObserver = observer;
-
-        // Observe the entire workspace for changes
-        const workspaceEl = this.app.workspace.containerEl;
-        observer.observe(workspaceEl, {
-            childList: true,
-            subtree: true
-        });
-
-        // Also listen for active leaf changes to process new views
-        this.registerEvent(
-            this.app.workspace.on('active-leaf-change', (leaf) => {
-                if (leaf && leaf.view.getViewType() === 'markdown') {
-                    // Small delay to ensure the view is fully rendered
-                    setTimeout(() => {
-                        this.processLivePreviewHashtags(leaf.view.containerEl);
-                    }, 100);
-                }
-            })
-        );
-    }
-
-    private processLivePreviewHashtags(element: HTMLElement) {
-        // Find hashtag elements in Live Preview mode
-        // Look for spans with cm-hashtag-end class which contains the actual tag text
-        const hashtagElements = element.querySelectorAll('span.cm-hashtag-end:not([data-dynamic-tag-processed])');
-
-        hashtagElements.forEach(async (hashtagEl) => {
-            // Double-check if this element has already been processed (in case the attribute was added after the query)
-            if (hashtagEl.hasAttribute('data-dynamic-tag-processed')) {
-                return;
-            }
-
-            // Get the tag text from the element's text content
-            const tagText = hashtagEl.textContent?.trim();
-            if (!tagText) return;
-
-            // Find matching tag mapping
-            const mapping = this.settings.tagMappings.find(
-                m => m.enabled && m.tag.toLowerCase() === tagText.toLowerCase()
-            );
-
-            if (mapping) {
-                // Get frontmatter from the current file
-                const file = this.app.workspace.getActiveFile();
-                let frontmatter = {};
-                if (file) {
-                    const cache = this.app.metadataCache.getFileCache(file);
-                    frontmatter = cache?.frontmatter || {};
-                }
-
-                // Mark as processed immediately to prevent duplicate processing
-                hashtagEl.setAttribute('data-dynamic-tag-processed', 'true');
-
-                // Render the dynamic tag
-                await this.renderLivePreviewTag(hashtagEl as HTMLElement, tagText, mapping, frontmatter);
+                // Unmapped tags in live preview: return null for native styling
+                logger.logTagDecision(tag, 'NULL', 'no mapping found', { pos });
+                return null;
             }
         });
-    }
 
-    private async renderLivePreviewTag(
-        hashtagEl: HTMLElement,
-        tagText: string,
-        mapping: TagScriptMapping,
-        frontmatter: any
-    ) {
-        try {
-            // Load and execute the script
-            const renderFunction = await this.loadScript(mapping.scriptPath);
+        // Create ViewPlugin for live preview - only decorate in live preview mode
+        const livePreviewPlugin = ViewPlugin.fromClass(class {
+            decorations: DecorationSet;
 
-            // Create a span container for the script output
-            const container = createSpan({ cls: 'dynamic-tag-container' });
+            constructor(view: EditorView) {
+                logger.debug('VIEWPLUGIN', 'Constructor', { });
+                const isLivePreview = isEditorInLivePreviewMode(view);
+                // Only create decorations in live preview mode to avoid interfering with native hashtag rendering
+                this.decorations = isLivePreview ? tagMatchDecorator.createDeco(view) : Decoration.none;
+                this.logDecorationState(view, 'Constructor');
+            }
 
-            // Prepare context for the script
-            const scriptContext: ScriptContext = {
-                app: this.app,
-                tag: mapping.tag,
-                element: container,
-                sourcePath: this.app.workspace.getActiveFile()?.path || '',
-                frontmatter: frontmatter,
-                Notice: Notice
-            };
-
-            // Execute the render function
-            const result = await renderFunction(scriptContext);
-
-            // Clear any content added by the script
-            container.innerHTML = '';
-
-            // Output validation and fallback
-            if (result === null || result === undefined) {
-                container.innerHTML = `#${tagText}`;
-            } else if (typeof result === 'string') {
-                container.innerHTML = result;
-            } else if (result instanceof HTMLElement) {
-                container.appendChild(result);
-            } else {
-                const errorEl = createSpan({
-                    cls: 'dynamic-tag-error',
-                    text: `[Invalid output for #${mapping.tag}]`
+            update(update: ViewUpdate) {
+                // Check if editor mode changed
+                const editorModeChanged = update.startState.field(editorLivePreviewField as unknown as StateField<boolean>) !== 
+                                         update.state.field(editorLivePreviewField as unknown as StateField<boolean>);
+                
+                const docChanged = update.docChanged;
+                const selectionChanged = update.startState.selection.main !== update.state.selection.main;
+                
+                logger.debug('VIEWPLUGIN', 'Update called', { 
+                    docChanged, 
+                    selectionChanged, 
+                    editorModeChanged,
+                    cursor: update.state.selection.main.head 
                 });
-                container.appendChild(errorEl);
-            }
-
-            // Find the complete hashtag structure and replace it
-            const parentLine = hashtagEl.closest('.cm-line');
-            if (parentLine) {
-                // Find all hashtag-related spans for this specific tag
-                const hashtagSpans = parentLine.querySelectorAll(`span.cm-hashtag-begin.cm-tag-${tagText}, span.cm-hashtag-end.cm-tag-${tagText}`);
-
-                if (hashtagSpans.length >= 2) {
-                    // Replace all hashtag spans with our container
-                    const firstSpan = hashtagSpans[0];
-                    const lastSpan = hashtagSpans[hashtagSpans.length - 1];
-
-                    // Insert our container before the first span
-                    parentLine.insertBefore(container, firstSpan);
-
-                    // Remove all hashtag spans
-                    hashtagSpans.forEach(span => span.remove());
-
-                } else {
-                    // Fallback: just replace the end span
-                    hashtagEl.replaceWith(container);
+                
+                // Update decorations if document changed, selection changed, or editor mode changed
+                if (docChanged || selectionChanged || editorModeChanged) {
+                    logger.debug('VIEWPLUGIN', 'Rebuilding decorations', { 
+                        reason: docChanged ? 'doc changed' : selectionChanged ? 'selection changed' : 'mode changed' 
+                    });
+                    
+                    // Log BEFORE rebuild
+                    this.logDecorationState(update.view, 'Before rebuild');
+                    
+                    const isLivePreview = isEditorInLivePreviewMode(update.view);
+                    // Only create decorations in live preview mode to avoid double-rendering with native hashtags
+                    this.decorations = isLivePreview ? tagMatchDecorator.createDeco(update.view) : Decoration.none;
+                    
+                    // Log AFTER rebuild
+                    this.logDecorationState(update.view, 'After rebuild');
                 }
             }
 
-            // Ensure the container displays inline and doesn't break the line
-            container.style.verticalAlign = 'baseline';
-            container.style.margin = '0 2px';
+            logDecorationState(view: EditorView, context: string) {
+                // Log decoration set size
+                logger.debug('DECO-STATE', context, { 
+                    size: this.decorations.size,
+                    isEmpty: this.decorations.size === 0
+                });
+                
+                // Log DOM state - check for widget containers
+                const containers = view.dom.querySelectorAll('.dynamic-tag-container');
+                logger.debug('DOM-STATE', context, { 
+                    widgetContainersFound: containers.length,
+                    editorClasses: view.dom.className
+                });
+                
+                // Log parent element classes to understand context
+                const editorParent = view.dom.closest('.cm-editor');
+                if (editorParent) {
+                    logger.debug('EDITOR-STATE', context, {
+                        parentClasses: editorParent.className,
+                        isSource: editorParent.classList.contains('mod-source'),
+                        isLivePreview: editorParent.classList.contains('mod-live-preview')
+                    });
+                }
+                
+                // Iterate through decorations to see what's actually in the set
+                let decoCount = 0;
+                const decoTypes: string[] = [];
+                this.decorations.between(0, view.state.doc.length, (from, to, deco) => {
+                    decoCount++;
+                    if (deco.spec.widget) {
+                        decoTypes.push('widget');
+                    } else if (deco.spec.mark) {
+                        decoTypes.push('mark');
+                    } else {
+                        decoTypes.push('other');
+                    }
+                });
+                logger.debug('DECO-DETAILS', context, { 
+                    iteratedCount: decoCount,
+                    types: decoTypes 
+                });
+            }
 
-        } catch (error) {
-            console.error(`Error rendering tag #${mapping.tag}:`, error);
-            const errorEl = createSpan({
-                cls: 'dynamic-tag-error',
-                text: `[Error rendering #${mapping.tag}]`
-            });
+            destroy() {
+                logger.debug('VIEWPLUGIN', 'Destroyed', {});
+            }
+        }, {
+            decorations: v => v.decorations
+        });
 
-            // Fallback: just replace the end span with error
-            hashtagEl.replaceWith(errorEl);
-        }
+        // Register the live preview plugin
+        this.registerEditorExtension(livePreviewPlugin);
     }
+
+
 
     private refreshActiveView() {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
-            // Force re-render by switching modes
             const currentMode = view.getMode();
             if (currentMode === 'preview') {
+                // Force re-render in preview mode
                 view.previewMode.rerender(true);
             } else if (currentMode === 'source') {
-                // Force refresh of editor decorations
-                const editor = view.editor;
-                if (editor && (editor as any).cm) {
-                    (editor as any).cm.dispatch();
-                }
+                // In source mode, no decorations to refresh - it's plain text
+                // The MatchDecorator will handle live preview mode automatically
+                return;
             }
+            // For live preview mode, the MatchDecorator will automatically update
         }
     }
 }

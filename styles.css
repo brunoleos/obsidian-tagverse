@@ -1,56 +1,11 @@
-/* Dynamic Tag Renderer Plugin Styles */
+/* Dynamic Tag Renderer - Minimal styles for inline widget display */
 
 .dynamic-tag-container {
+    display: inline-block;
     vertical-align: baseline;
-    margin: 0 2px;
 }
 
-/* Live Preview specific styles */
-.cm-line .dynamic-tag-container {
-    vertical-align: baseline;
-    margin: 0 2px;
-}
-
-/* Source mode specific styles */
-.cm-widgetBuffer + span.dynamic-tag-container,
-span.dynamic-tag-container + .cm-widgetBuffer {
-    vertical-align: baseline;
-    margin: 0 2px;
-}
-
-.dynamic-tag-error {
-    color: #b00020; /* dark red for text */
-    font-style: italic;
-    padding: 2px 6px;
-    background-color: #ffeaea; /* light red for background */
-    border-radius: 4px;
-}
-
-.dynamic-tag-mapping {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    background-color: var(--background-secondary);
-    border-radius: 4px;
-    margin-bottom: 8px;
-}
-
-.dynamic-tag-mapping .setting-item-control {
-    flex-grow: 1;
-    display: flex;
-    gap: 8px;
-}
-
-.dynamic-tag-mapping input[type="text"]:first-of-type {
-    width: 150px;
-}
-
-.dynamic-tag-mapping input[type="text"]:nth-of-type(2) {
-    flex-grow: 1;
-}
-
-/* Mark decoration style (for plain text display when cursor is inside or in source mode) */
-.dynamic-tag-inline-mark {
-    /* Inherit normal hashtag styling */
+/* CodeMirror-specific overrides for live preview - MAXIMUM FLEXIBILITY */
+.cm-line .dynamic-tag-container * {
+    white-space: nowrap !important;
 }

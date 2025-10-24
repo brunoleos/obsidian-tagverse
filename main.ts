@@ -114,9 +114,38 @@ class DynamicTagWidget extends WidgetType {
 
     toDOM(): HTMLElement {
         logger.debug('WIDGET', 'toDOM called', { tag: this.tag, rendered: this.rendered });
+        
+        // Log container details
+        if (this.container) {
+            const computedStyle = window.getComputedStyle(this.container);
+            logger.debug('WIDGET-DOM', 'Container details', {
+                tag: this.tag,
+                classes: this.container.className,
+                display: computedStyle.display,
+                position: computedStyle.position,
+                innerHTML: this.container.innerHTML.substring(0, 100)
+            });
+        }
+        
         if (!this.rendered) {
             this.renderContent();
         }
+        
+        // Log after rendering queued
+        setTimeout(() => {
+            if (this.container) {
+                const computedStyle = window.getComputedStyle(this.container);
+                logger.debug('WIDGET-DOM', 'After render', {
+                    tag: this.tag,
+                    display: computedStyle.display,
+                    position: computedStyle.position,
+                    width: computedStyle.width,
+                    height: computedStyle.height,
+                    outerHTML: this.container.outerHTML.substring(0, 200)
+                });
+            }
+        }, 100);
+        
         return this.container!;
     }
 
@@ -124,11 +153,17 @@ class DynamicTagWidget extends WidgetType {
         if (this.rendered) return;
         this.rendered = true;
 
-        logger.debug('WIDGET', 'Rendering content', { tag: this.tag, script: this.mapping.scriptPath });
+        console.group(`👁️ [DTR] Live Preview: #${this.tag}`);
 
         try {
+            logger.debug('LIVE-MODE', 'Starting render', { 
+                tag: this.tag, 
+                script: this.mapping.scriptPath,
+                sourcePath: this.sourcePath 
+            });
+
             const renderFunction = await this.plugin.loadScript(this.mapping.scriptPath);
-            logger.debug('WIDGET', 'Script loaded', { tag: this.tag, script: this.mapping.scriptPath });
+            logger.debug('LIVE-MODE', 'Script loaded', { tag: this.tag });
 
             // Create a temporary container for the script to render into
             const tempContainer = createSpan();
@@ -143,7 +178,26 @@ class DynamicTagWidget extends WidgetType {
             };
 
             const result = await renderFunction(scriptContext);
-            logger.debug('WIDGET', 'Script executed', { tag: this.tag, resultType: typeof result });
+            
+            // Log script return value with full HTML
+            if (result instanceof HTMLElement) {
+                const resultStyle = window.getComputedStyle(result);
+                logger.debug('LIVE-SCRIPT', 'Return value (HTMLElement)', {
+                    tag: this.tag,
+                    tagName: result.tagName,
+                    className: result.className,
+                    display: resultStyle.display,
+                    position: resultStyle.position
+                });
+                console.log('📦 Script return innerHTML:', result.innerHTML);
+                console.log('📦 Script return outerHTML:', result.outerHTML);
+            } else {
+                logger.debug('LIVE-SCRIPT', 'Return value', { 
+                    tag: this.tag, 
+                    type: typeof result,
+                    isNull: result === null || result === undefined
+                });
+            }
 
             // Clear any content added by the script
             this.container!.innerHTML = '';
@@ -151,16 +205,27 @@ class DynamicTagWidget extends WidgetType {
             // Output validation and fallback
             if (result === null || result === undefined) {
                 this.container!.innerHTML = `#${this.tag}`;
-                logger.debug('WIDGET', 'Output: null/undefined - showing plain tag', { tag: this.tag });
+                logger.debug('LIVE-MODE', 'Output: null/undefined - showing plain tag', { tag: this.tag });
             } else if (typeof result === 'string') {
                 this.container!.innerHTML = result;
-                logger.debug('WIDGET', 'Output: string HTML', { tag: this.tag, length: result.length });
+                logger.debug('LIVE-MODE', 'Output: string HTML', { tag: this.tag, length: result.length });
+                console.log('📝 String content:', result);
             } else if (result instanceof HTMLElement) {
                 this.container!.appendChild(result);
-                logger.debug('WIDGET', 'Output: HTMLElement', { tag: this.tag, element: result.tagName });
+                
+                // Log after appending
+                const resultStyle = window.getComputedStyle(result);
+                logger.debug('LIVE-SCRIPT', 'After append to container', {
+                    tag: this.tag,
+                    display: resultStyle.display,
+                    position: resultStyle.position,
+                    parentDisplay: window.getComputedStyle(this.container!).display
+                });
+                
+                logger.debug('LIVE-MODE', 'Output: HTMLElement appended', { tag: this.tag, element: result.tagName });
             } else {
                 this.container!.innerHTML = `[Invalid output for #${this.mapping.tag}]`;
-                logger.warn('WIDGET', 'Invalid output type', { tag: this.tag, type: typeof result });
+                logger.warn('LIVE-MODE', 'Invalid output type', { tag: this.tag, type: typeof result });
             }
 
             // Ensure the container displays inline and doesn't break the line
@@ -168,14 +233,28 @@ class DynamicTagWidget extends WidgetType {
             this.container!.style.verticalAlign = 'baseline';
             this.container!.style.margin = '0 2px';
 
-            logger.debug('WIDGET', 'Rendering complete', { tag: this.tag, finalHTML: this.container!.outerHTML.substring(0, 100) });
+            // Log final container state with full HTML
+            const finalContainerStyle = window.getComputedStyle(this.container!);
+            logger.debug('LIVE-FINAL', 'After inline styles set', {
+                tag: this.tag,
+                containerDisplay: finalContainerStyle.display,
+                containerPosition: finalContainerStyle.position,
+                width: finalContainerStyle.width,
+                height: finalContainerStyle.height
+            });
+            console.log('✅ Final container innerHTML:', this.container!.innerHTML);
+            console.log('✅ Final container outerHTML:', this.container!.outerHTML);
+
+            logger.debug('LIVE-MODE', 'Render complete', { tag: this.tag });
 
         } catch (error) {
-            logger.error('WIDGET', 'Rendering failed', error);
+            logger.error('LIVE-MODE', 'Rendering failed', error);
             this.plugin.app.workspace.onLayoutReady(() => {
                 new Notice(`Error rendering tag #${this.mapping.tag}: ${error.message}`);
             });
             this.container!.innerHTML = `[Error: #${this.mapping.tag}]`;
+        } finally {
+            console.groupEnd();
         }
     }
 }
@@ -221,6 +300,9 @@ export default class DynamicTagRendererPlugin extends Plugin {
                         viewType: view.getViewType(), 
                         mode: mode 
                     });
+                    
+                    // Inspect DOM when view changes
+                    this.inspectDOMState(mode);
                 }
             })
         );
@@ -229,6 +311,15 @@ export default class DynamicTagRendererPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on('layout-change', () => {
                 logger.info('WORKSPACE', 'Layout changed');
+                
+                // Inspect DOM state after layout change
+                setTimeout(() => {
+                    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                    if (view) {
+                        const mode = view.getMode();
+                        this.inspectDOMState(mode);
+                    }
+                }, 50); // Small delay to ensure DOM is updated
             })
         );
 
@@ -312,12 +403,25 @@ export default class DynamicTagRendererPlugin extends Plugin {
         mapping: TagScriptMapping,
         context: MarkdownPostProcessorContext
     ) {
+        console.group(`📖 [DTR] Reading Mode: #${mapping.tag}`);
+        
         try {
+            logger.debug('READING-MODE', 'Starting render', { 
+                tag: mapping.tag, 
+                script: mapping.scriptPath,
+                sourcePath: context.sourcePath 
+            });
+            
             // Load and execute the script
             const renderFunction = await this.loadScript(mapping.scriptPath);
+            logger.debug('READING-MODE', 'Script loaded', { tag: mapping.tag });
 
             // Create a span container for consistency with Live Preview
             const container = createSpan({ cls: 'dynamic-tag-container' });
+            logger.debug('READING-MODE', 'Container created', {
+                tag: mapping.tag,
+                className: container.className
+            });
 
             // Prepare context for the script
             const scriptContext: ScriptContext = {
@@ -331,6 +435,26 @@ export default class DynamicTagRendererPlugin extends Plugin {
 
             // Execute the render function
             const result = await renderFunction(scriptContext);
+            
+            // Log script return value with full HTML
+            if (result instanceof HTMLElement) {
+                const resultStyle = window.getComputedStyle(result);
+                logger.debug('READING-SCRIPT', 'Return value (HTMLElement)', {
+                    tag: mapping.tag,
+                    tagName: result.tagName,
+                    className: result.className,
+                    display: resultStyle.display,
+                    position: resultStyle.position
+                });
+                console.log('📦 Script return innerHTML:', result.innerHTML);
+                console.log('📦 Script return outerHTML:', result.outerHTML);
+            } else {
+                logger.debug('READING-SCRIPT', 'Return value', { 
+                    tag: mapping.tag, 
+                    type: typeof result,
+                    isNull: result === null || result === undefined
+                });
+            }
 
             // Clear any content added by the script
             container.innerHTML = '';
@@ -339,10 +463,24 @@ export default class DynamicTagRendererPlugin extends Plugin {
             if (result === null || result === undefined) {
                 // Show original tag if script returns nothing
                 container.appendChild(tagEl.cloneNode(true));
+                logger.debug('READING-MODE', 'Output: null/undefined - showing original tag', { tag: mapping.tag });
             } else if (typeof result === 'string') {
                 container.innerHTML = result;
+                logger.debug('READING-MODE', 'Output: string HTML', { tag: mapping.tag, length: result.length });
+                console.log('📝 String content:', result);
             } else if (result instanceof HTMLElement) {
                 container.appendChild(result);
+                
+                // Log after appending
+                const resultStyle = window.getComputedStyle(result);
+                logger.debug('READING-SCRIPT', 'After append to container', {
+                    tag: mapping.tag,
+                    display: resultStyle.display,
+                    position: resultStyle.position,
+                    parentDisplay: window.getComputedStyle(container).display
+                });
+                
+                logger.debug('READING-MODE', 'Output: HTMLElement appended', { tag: mapping.tag, element: result.tagName });
             } else {
                 // Show error if output type is invalid
                 const errorEl = createSpan({
@@ -350,15 +488,30 @@ export default class DynamicTagRendererPlugin extends Plugin {
                     text: `[Invalid output for #${mapping.tag}]`
                 });
                 container.appendChild(errorEl);
+                logger.warn('READING-MODE', 'Invalid output type', { tag: mapping.tag, type: typeof result });
             }
 
             // Ensure the container displays inline and doesn't break the line
             container.style.verticalAlign = 'baseline';
             container.style.margin = '0 2px';
+            
+            // Log final container state with full HTML
+            const finalContainerStyle = window.getComputedStyle(container);
+            logger.debug('READING-FINAL', 'After styles set', {
+                tag: mapping.tag,
+                containerDisplay: finalContainerStyle.display,
+                containerPosition: finalContainerStyle.position,
+                width: finalContainerStyle.width,
+                height: finalContainerStyle.height
+            });
+            console.log('✅ Final container innerHTML:', container.innerHTML);
+            console.log('✅ Final container outerHTML:', container.outerHTML);
 
             tagEl.replaceWith(container);
+            logger.debug('READING-MODE', 'Render complete', { tag: mapping.tag });
 
         } catch (error) {
+            logger.error('READING-MODE', 'Rendering failed', error);
             // Use Notice for user feedback instead of console.error
             new Notice(`Error rendering tag #${mapping.tag}: ${error.message}`);
             const errorEl = createSpan({
@@ -366,6 +519,8 @@ export default class DynamicTagRendererPlugin extends Plugin {
                 text: `[Error: #${mapping.tag}]`
             });
             tagEl.replaceWith(errorEl);
+        } finally {
+            console.groupEnd();
         }
     }
 
@@ -585,6 +740,138 @@ export default class DynamicTagRendererPlugin extends Plugin {
     }
 
 
+
+    private inspectDOMState(mode: string) {
+        console.group(`🔍 [DTR] DOM Inspection - ${mode.toUpperCase()} mode`);
+
+        try {
+            // Find all widget containers in the document
+            const containers = document.querySelectorAll('.dynamic-tag-container');
+            logger.info('DOM-INSPECT', 'Containers found', { mode, count: containers.length });
+
+            // Log theme and CSS information
+            console.log('🎨 Active theme:', this.getActiveTheme());
+            console.log('🎨 Applied stylesheets:', Array.from(document.styleSheets).map((sheet, i) => ({
+                index: i,
+                href: sheet.href || 'inline',
+                title: sheet.title || 'no-title',
+                rules: sheet.cssRules?.length || 0
+            })));
+
+            containers.forEach((container, index) => {
+                const htmlElement = container as HTMLElement;
+                const computedStyle = window.getComputedStyle(htmlElement);
+
+                // Get the tag name from the content
+                const contentPreview = htmlElement.textContent?.substring(0, 50) || '';
+
+                logger.debug('DOM-INSPECT', `Container[${index}]`, {
+                    mode,
+                    display: computedStyle.display,
+                    position: computedStyle.position,
+                    width: computedStyle.width,
+                    height: computedStyle.height,
+                    float: computedStyle.float,
+                    verticalAlign: computedStyle.verticalAlign,
+                    margin: computedStyle.margin,
+                    padding: computedStyle.padding,
+                    lineHeight: computedStyle.lineHeight,
+                    fontSize: computedStyle.fontSize,
+                    whiteSpace: computedStyle.whiteSpace,
+                    wordWrap: computedStyle.wordWrap,
+                    overflow: computedStyle.overflow,
+                    contentPreview
+                });
+
+                console.log(`📦 Container[${index}] innerHTML:`, htmlElement.innerHTML);
+                console.log(`📦 Container[${index}] outerHTML:`, htmlElement.outerHTML);
+
+                // Log computed styles for all elements in the hierarchy
+                this.logElementStyles(htmlElement, index, mode);
+
+                // Log parent chain with detailed styles
+                let parent = htmlElement.parentElement;
+                let level = 1;
+                const parentChain: string[] = [];
+                while (parent && level <= 5) { // Increased depth
+                    const parentStyle = window.getComputedStyle(parent);
+                    parentChain.push(`${parent.tagName}.${parent.className || '(no class)'}`);
+                    logger.debug('DOM-INSPECT', `Container[${index}] Parent[${level}]`, {
+                        tag: parent.tagName,
+                        className: parent.className,
+                        display: parentStyle.display,
+                        position: parentStyle.position,
+                        width: parentStyle.width,
+                        height: parentStyle.height,
+                        margin: parentStyle.margin,
+                        padding: parentStyle.padding,
+                        lineHeight: parentStyle.lineHeight,
+                        fontSize: parentStyle.fontSize
+                    });
+                    parent = parent.parentElement;
+                    level++;
+                }
+                console.log(`🔗 Container[${index}] Parent chain:`, parentChain.join(' → '));
+            });
+
+            if (containers.length === 0) {
+                logger.warn('DOM-INSPECT', 'No containers found', { mode });
+            }
+
+        } catch (error) {
+            logger.error('DOM-INSPECT', 'Inspection failed', error);
+        } finally {
+            console.groupEnd();
+        }
+    }
+
+    private getActiveTheme(): string {
+        // Try to detect the active theme
+        const bodyClasses = document.body.className;
+        if (bodyClasses.includes('theme-dark')) return 'Dark';
+        if (bodyClasses.includes('theme-light')) return 'Light';
+        return 'Unknown';
+    }
+
+    private logElementStyles(element: HTMLElement, containerIndex: number, mode: string) {
+        console.group(`🎨 Container[${containerIndex}] Style Analysis`);
+
+        try {
+            // Log all child elements and their computed styles
+            const allElements = element.querySelectorAll('*');
+            const elements = [element, ...Array.from(allElements)];
+
+            elements.forEach((el, elIndex) => {
+                const htmlEl = el as HTMLElement;
+                const style = window.getComputedStyle(htmlEl);
+
+                // Only log elements that might affect layout
+                if (elIndex === 0 || style.display !== 'inline' || htmlEl.children.length > 0) {
+                    console.log(`  ${elIndex === 0 ? '📦 Container' : `  ${htmlEl.tagName}.${htmlEl.className || '(no class)'}`}:`, {
+                        display: style.display,
+                        position: style.position,
+                        width: style.width,
+                        height: style.height,
+                        margin: style.margin,
+                        padding: style.padding,
+                        lineHeight: style.lineHeight,
+                        fontSize: style.fontSize,
+                        whiteSpace: style.whiteSpace,
+                        wordWrap: style.wordWrap,
+                        overflow: style.overflow,
+                        flexDirection: style.flexDirection,
+                        alignItems: style.alignItems,
+                        justifyContent: style.justifyContent
+                    });
+                }
+            });
+
+        } catch (error) {
+            console.error('Style analysis failed:', error);
+        } finally {
+            console.groupEnd();
+        }
+    }
 
     private refreshActiveView() {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);

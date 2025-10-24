@@ -1,8 +1,21 @@
 /* Dynamic Tag Renderer Plugin Styles */
 
 .dynamic-tag-container {
-    display: inline-block;
-    vertical-align: middle;
+    vertical-align: baseline;
+    margin: 0 2px;
+}
+
+/* Live Preview specific styles */
+.cm-line .dynamic-tag-container {
+    vertical-align: baseline;
+    margin: 0 2px;
+}
+
+/* Source mode specific styles */
+.cm-widgetBuffer + span.dynamic-tag-container,
+span.dynamic-tag-container + .cm-widgetBuffer {
+    vertical-align: baseline;
+    margin: 0 2px;
 }
 
 .dynamic-tag-error {

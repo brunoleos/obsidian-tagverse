@@ -1,6 +1,6 @@
-# Complete Guide: Developing and Publishing Your Obsidian Plugin
+# Complete Guide: Developing and Publishing Tagverse
 
-This is your complete step-by-step guide from initial setup to publishing on the Obsidian Community Plugins directory.
+This is your complete step-by-step guide from initial setup to publishing Tagverse on the Obsidian Community Plugins directory.
 
 ## Part 1: Development Environment Setup
 
@@ -20,7 +20,7 @@ Before you start, ensure you have:
 **Important**: Plugin development happens **outside Obsidian** using VS Code (or any code editor). Here's the workflow:
 
 ```
-1. Write code in VS Code (main.ts) 
+1. Write code in VS Code (src/ directory)
    ↓
 2. Build with npm (creates main.js)
    ↓
@@ -33,6 +33,27 @@ Before you start, ensure you have:
 
 **You do NOT develop inside Obsidian.** Obsidian is only used for testing the compiled plugin.
 
+### Project Architecture
+
+The plugin uses a modular TypeScript architecture:
+
+```
+src/
+├── types/interfaces.ts      # TypeScript interfaces and types
+├── core/
+│   ├── plugin.ts           # Main plugin class (TagversePlugin)
+│   └── widget.ts           # Widget class (TagverseWidget)
+├── settings/
+│   └── settings-tab.ts     # Settings UI (TagverseSettingTab)
+├── utils/
+│   └── logger.ts           # Logger utility
+├── constants/
+│   └── index.ts            # Constants and configuration
+└── index.ts                # Main exports
+```
+
+This structure provides better maintainability, type safety, and scalability compared to a single-file approach.
+
 ---
 
 ## Part 2: Initial Project Setup
@@ -41,8 +62,8 @@ Before you start, ensure you have:
 
 ```bash
 # Create and navigate to your project folder
-mkdir obsidian-dynamic-tag-renderer
-cd obsidian-dynamic-tag-renderer
+mkdir obsidian-tagverse
+cd obsidian-tagverse
 ```
 
 ### Step 2: Initialize Git Repository
@@ -58,7 +79,7 @@ Create the following files in your project folder. You can do this in VS Code or
 
 **File Structure to Create:**
 ```
-obsidian-dynamic-tag-renderer/
+obsidian-tagverse/
 ├── main.ts
 ├── manifest.json
 ├── package.json
@@ -73,6 +94,20 @@ obsidian-dynamic-tag-renderer/
 ├── QUICKSTART.md
 ├── DOCUMENTATION.md
 ├── CHANGELOG.md
+├── src/
+│   ├── index.ts
+│   ├── types/
+│   │   └── interfaces.ts
+│   ├── core/
+│   │   ├── plugin.ts
+│   │   └── widget.ts
+│   ├── settings/
+│   │   └── settings-tab.ts
+│   ├── utils/
+│   │   └── logger.ts
+│   └── constants/
+│       └── index.ts
+├── logger.ts
 └── examples/
     └── example-script.js
 ```
@@ -95,11 +130,11 @@ Edit these files with your details:
 **`manifest.json`:**
 ```json
 {
-    "id": "dynamic-tag-renderer",
-    "name": "Dynamic Tag Renderer",
+    "id": "tagverse",
+    "name": "Tagverse",
     "version": "1.0.0",
     "minAppVersion": "0.15.0",
-    "description": "Dynamically render tags with custom JavaScript scripts",
+    "description": "Transform tags into interactive universes of JavaScript-powered content",
     "author": "YOUR NAME HERE",  // ← Change this
     "authorUrl": "https://github.com/YOUR-USERNAME",  // ← Change this
     "fundingUrl": "https://github.com/sponsors/YOUR-USERNAME",  // ← Optional
@@ -110,9 +145,9 @@ Edit these files with your details:
 **`package.json`:**
 ```json
 {
-    "name": "obsidian-dynamic-tag-renderer",
+    "name": "obsidian-tagverse",
     "version": "1.0.0",
-    "description": "Dynamically render tags with custom JavaScript scripts",
+    "description": "Transform tags into interactive universes of JavaScript-powered content",
     "author": "YOUR NAME HERE",  // ← Change this
     "license": "MIT",
     // ... rest stays the same
@@ -170,15 +205,15 @@ This creates an optimized `main.js` without source maps.
 
 3. **Create plugin folder:**
    ```bash
-   mkdir -p /path/to/vault/.obsidian/plugins/dynamic-tag-renderer
+   mkdir -p /path/to/vault/.obsidian/plugins/tagverse
    ```
 
 4. **Copy files to plugin folder:**
    ```bash
    # From your project directory, copy these files:
-   cp main.js /path/to/vault/.obsidian/plugins/dynamic-tag-renderer/
-   cp manifest.json /path/to/vault/.obsidian/plugins/dynamic-tag-renderer/
-   cp styles.css /path/to/vault/.obsidian/plugins/dynamic-tag-renderer/
+   cp main.js /path/to/vault/.obsidian/plugins/tagverse/
+   cp manifest.json /path/to/vault/.obsidian/plugins/tagverse/
+   cp styles.css /path/to/vault/.obsidian/plugins/tagverse/
    ```
 
 ### Step 4: Enable Plugin in Obsidian
@@ -186,37 +221,39 @@ This creates an optimized `main.js` without source maps.
 1. Open your test vault in Obsidian
 2. Go to **Settings** → **Community plugins**
 3. Make sure **Restricted Mode** is OFF
-4. Find "Dynamic Tag Renderer" in the list
+4. Find "Tagverse" in the list
 5. Click the toggle to enable it
 
 ### Step 5: Development Cycle
 
 Now you're ready to develop! The cycle is:
 
-1. **Edit code in VS Code** (`main.ts`)
+1. **Edit code in VS Code** (files in `src/` directory)
 2. **Save the file** (auto-builds if `npm run dev` is running)
 3. **Copy `main.js` to plugin folder**
    ```bash
-   cp main.js /path/to/vault/.obsidian/plugins/dynamic-tag-renderer/
+   cp main.js /path/to/vault/.obsidian/plugins/tagverse/
    ```
 4. **Reload Obsidian** (Ctrl+R / Cmd+R)
 5. **Test your changes**
 6. **Check for errors** (Ctrl+Shift+I for DevTools Console)
 7. **Repeat**
 
+**Note:** Edit the modular files in the `src/` directory, not `main.ts`. The `main.ts` file is just an entry point that imports from the modular structure.
+
 **Pro Tip:** Create a script to automate copying:
 
 **`copy-to-vault.sh` (Mac/Linux):**
 ```bash
 #!/bin/bash
-cp main.js ~/Documents/MyTestVault/.obsidian/plugins/dynamic-tag-renderer/
+cp main.js ~/Documents/MyTestVault/.obsidian/plugins/tagverse/
 echo "Plugin copied! Reload Obsidian."
 ```
 
 **`copy-to-vault.bat` (Windows):**
 ```batch
 @echo off
-copy main.js "C:\Users\YourName\Documents\MyTestVault\.obsidian\plugins\dynamic-tag-renderer\"
+copy main.js "C:\Users\YourName\Documents\MyTestVault\.obsidian\plugins\tagverse\"
 echo Plugin copied! Reload Obsidian.
 ```
 
@@ -315,8 +352,8 @@ Or manually edit:
 ### Step 4: Create GitHub Repository
 
 1. Go to https://github.com/new
-2. Repository name: `obsidian-dynamic-tag-renderer`
-3. Description: "Dynamically render Obsidian tags with custom JavaScript"
+2. Repository name: `obsidian-tagverse`
+3. Description: "Transform tags into interactive universes of JavaScript-powered content"
 4. Make it **PUBLIC** (required for community plugins)
 5. **Don't** initialize with README (you already have one)
 6. Click "Create repository"
@@ -331,7 +368,7 @@ git add .
 git commit -m "Initial commit"
 
 # Add remote (replace YOUR-USERNAME)
-git remote add origin https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer.git
+git remote add origin https://github.com/YOUR-USERNAME/obsidian-tagverse.git
 
 # Push
 git push -u origin main
@@ -355,12 +392,12 @@ git push origin 1.0.0
 5. Description:
 
 ```markdown
-# Dynamic Tag Renderer v1.0.0
+# Tagverse v1.0.0
 
 Initial release! 🎉
 
 ## Features
-- ✨ Dynamically render tags with custom JavaScript
+- ✨ Transform tags into interactive JavaScript-powered content
 - ⚙️ Flexible tag-script mapping configuration
 - 🔄 Auto-refresh on file changes
 - 💾 Script caching for performance
@@ -369,13 +406,13 @@ Initial release! 🎉
 ## Installation
 
 Download the files below and place them in:
-`VaultFolder/.obsidian/plugins/dynamic-tag-renderer/`
+`VaultFolder/.obsidian/plugins/tagverse/`
 
 Then reload Obsidian and enable the plugin.
 
 ## Quick Start
 
-See the [README](https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer) for usage instructions.
+See the [README](https://github.com/YOUR-USERNAME/obsidian-tagverse) for usage instructions.
 ```
 
 6. **Upload these files** (from your project folder):
@@ -406,7 +443,7 @@ cd obsidian-releases
 ### Step 3: Create New Branch
 
 ```bash
-git checkout -b add-dynamic-tag-renderer
+git checkout -b add-tagverse
 ```
 
 ### Step 4: Edit community-plugins.json
@@ -415,11 +452,11 @@ Open `community-plugins.json` in your editor and add your plugin **in alphabetic
 
 ```json
 {
-  "id": "dynamic-tag-renderer",
-  "name": "Dynamic Tag Renderer",
+  "id": "tagverse",
+  "name": "Tagverse",
   "author": "YOUR NAME",
-  "description": "Dynamically render tags with custom JavaScript scripts. Transform tags into interactive content using your own render functions.",
-  "repo": "YOUR-USERNAME/obsidian-dynamic-tag-renderer"
+  "description": "Transform tags into interactive universes of JavaScript-powered content",
+  "repo": "YOUR-USERNAME/obsidian-tagverse"
 }
 ```
 
@@ -432,31 +469,31 @@ Open `community-plugins.json` in your editor and add your plugin **in alphabetic
 
 ```bash
 git add community-plugins.json
-git commit -m "Add Dynamic Tag Renderer plugin"
-git push origin add-dynamic-tag-renderer
+git commit -m "Add Tagverse plugin"
+git push origin add-tagverse
 ```
 
 ### Step 6: Create Pull Request
 
 1. Go to your fork on GitHub
 2. You'll see a banner: "Compare & pull request" → Click it
-3. Title: `Add Dynamic Tag Renderer plugin`
+3. Title: `Add Tagverse plugin`
 4. Description:
 
 ```markdown
 ## Plugin Submission
 
-**Plugin Name:** Dynamic Tag Renderer  
-**Repository:** https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer  
-**Release:** v1.0.0  
+**Plugin Name:** Tagverse
+**Repository:** https://github.com/YOUR-USERNAME/obsidian-tagverse
+**Release:** v1.0.0
 
 ## Description
 
-Dynamic Tag Renderer allows users to transform Obsidian tags into interactive, dynamic content using custom JavaScript render functions. Users can map specific tags to scripts that execute when the tag is displayed in preview/reading mode.
+Tagverse allows users to transform Obsidian tags into interactive universes of JavaScript-powered content. Users can map specific tags to scripts that execute when the tag is displayed in preview/reading mode.
 
 ## Key Features
 
-- Map tags to custom JavaScript render functions
+- Transform tags into interactive JavaScript-powered content
 - Access full Obsidian API from scripts
 - Script caching for performance
 - Flexible configuration interface
@@ -589,7 +626,7 @@ npm install
 **TypeScript errors**
 ```bash
 npx tsc --noEmit  # Check errors
-# Fix issues in main.ts
+# Fix issues in src/ files
 ```
 
 ### Plugin Not Loading in Obsidian
@@ -626,7 +663,7 @@ git remote add origin <URL>      # Add correct one
    - Run `npm install`
 
 2. ✅ **Develop** (iterative)
-   - Edit code in VS Code (`main.ts`)
+   - Edit code in VS Code (files in `src/` directory)
    - Run `npm run dev` (keep running)
    - Copy `main.js` to test vault
    - Reload Obsidian and test
@@ -653,7 +690,7 @@ git remote add origin <URL>      # Add correct one
 
 - 📖 [Obsidian Plugin Docs](https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin)
 - 💬 [Obsidian Discord](https://discord.gg/obsidianmd) - #plugin-dev channel
-- 🐛 [Report Issues](https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer/issues)
+- 🐛 [Report Issues](https://github.com/YOUR-USERNAME/obsidian-tagverse/issues)
 - 📧 [Email Obsidian Support](support@obsidian.md)
 
 **Good luck with your plugin! 🚀**

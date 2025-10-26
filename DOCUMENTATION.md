@@ -1,12 +1,13 @@
-# Dynamic Tag Renderer - Advanced Documentation
+# Tagverse - Advanced Documentation
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
-2. [Script Development Guide](#script-development-guide)
-3. [Advanced Examples](#advanced-examples)
-4. [API Reference](#api-reference)
-5. [Performance Optimization](#performance-optimization)
-6. [Troubleshooting](#troubleshooting)
+2. [Project Structure](#project-structure)
+3. [Script Development Guide](#script-development-guide)
+4. [Advanced Examples](#advanced-examples)
+5. [API Reference](#api-reference)
+6. [Performance Optimization](#performance-optimization)
+7. [Troubleshooting](#troubleshooting)
 
 ## Architecture Overview
 
@@ -26,6 +27,32 @@ Load Script → Cache → Execute render() → Return Content → Replace Tag
      ↓           ↓          ↓                  ↓             ↓
   From Vault  Memory    With Context      Element/HTML   In Document
 ```
+
+### Modular Architecture
+
+The plugin follows a clean, modular TypeScript architecture:
+
+```
+src/
+├── types/interfaces.ts      # TypeScript interfaces and types
+├── core/
+│   ├── plugin.ts           # Main plugin class (TagversePlugin)
+│   └── widget.ts           # Widget class (TagverseWidget)
+├── settings/
+│   └── settings-tab.ts     # Settings UI (TagverseSettingTab)
+├── utils/
+│   └── logger.ts           # Logger utility
+├── constants/
+│   └── index.ts            # Constants and configuration
+└── index.ts                # Main exports
+```
+
+This structure provides:
+- **Separation of Concerns**: Each module has a single responsibility
+- **Type Safety**: Comprehensive TypeScript interfaces
+- **Maintainability**: Easy to find and modify specific functionality
+- **Testability**: Individual modules can be tested in isolation
+- **Scalability**: Simple to add new features without cluttering existing code
 
 ## Script Development Guide
 

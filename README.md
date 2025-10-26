@@ -194,6 +194,25 @@ Turn #habit-tracker into an interactive progress tracker
 
 ## Development
 
+### Project Structure
+
+The plugin uses a modular TypeScript architecture:
+
+```
+src/
+├── types/interfaces.ts      # TypeScript interfaces and types
+├── core/
+│   ├── plugin.ts           # Main plugin class (TagversePlugin)
+│   └── widget.ts           # Widget class (TagverseWidget)
+├── settings/
+│   └── settings-tab.ts     # Settings UI (TagverseSettingTab)
+├── utils/
+│   └── logger.ts           # Logger utility
+├── constants/
+│   └── index.ts            # Constants and configuration
+└── index.ts                # Main exports
+```
+
 ### Setup
 ```bash
 npm install

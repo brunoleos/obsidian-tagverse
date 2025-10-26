@@ -1,11 +1,11 @@
-# Dynamic Tag Renderer - Project Structure
+# Tagverse - Project Structure
 
 ## Complete File Structure
 
 ```
-obsidian-dynamic-tag-renderer/
+obsidian-tagverse/
 │
-├── 📄 main.ts                      # Main plugin source code
+├── 📄 main.ts                      # Main entry point (imports from src/)
 ├── 📄 manifest.json                # Plugin metadata
 ├── 📄 package.json                 # NPM dependencies & scripts
 ├── 📄 tsconfig.json                # TypeScript configuration
@@ -23,6 +23,23 @@ obsidian-dynamic-tag-renderer/
 ├── 📖 CHANGELOG.md                 # Version history
 ├── 📖 PROJECT_STRUCTURE.md         # This file
 │
+├── 📁 src/                         # Modular source code
+│   ├── 📄 index.ts                 # Main exports
+│   ├── 📁 types/
+│   │   └── 📄 interfaces.ts         # TypeScript interfaces and types
+│   ├── 📁 core/
+│   │   ├── 📄 plugin.ts             # Main plugin class (TagversePlugin)
+│   │   ├── 📄 renderer.ts           # Abstract TagRenderer base class
+│   │   ├── 📄 reading-mode-renderer.ts   # Reading mode renderer
+│   │   └── 📄 live-preview-renderer.ts   # Live preview renderer & widget
+│   ├── 📁 settings/
+│   │   └── 📄 settings-tab.ts       # Settings UI (TagverseSettingTab)
+│   ├── 📁 utils/
+│   │   └── 📄 logger.ts             # Logger utility
+│   └── 📁 constants/
+│       └── 📄 index.ts             # Constants and configuration
+│
+├── 📄 logger.ts                    # Legacy logger (superseded by src/utils/logger.ts)
 ├── 📁 examples/
 │   └── 📄 example-script.js        # Example render scripts
 │
@@ -40,23 +57,69 @@ obsidian-dynamic-tag-renderer/
 ### Source Files
 
 #### `main.ts`
-The heart of the plugin. Contains:
-- **DynamicTagRendererPlugin**: Main plugin class
-  - `onload()`: Initialize plugin
-  - `onunload()`: Cleanup
-  - `processMarkdown()`: Intercept and transform tags
-  - `renderDynamicTag()`: Execute render scripts
-  - `loadScript()`: Load and cache scripts
-  - `refreshActiveView()`: Force re-render
-- **DynamicTagRendererSettingTab**: Settings UI
-  - Tag-script mappings management
-  - Add/edit/delete mappings
-  - Enable/disable individual mappings
-- **Interfaces**: TypeScript type definitions
+Entry point that imports and exports from the modular `src/` structure.
+
+#### `src/index.ts`
+Main exports file that re-exports all public components from the modular structure.
+
+#### `src/types/interfaces.ts`
+All TypeScript interfaces and types:
+- `TagScriptMapping`: Configuration for tag-script mappings
+- `ScriptContext`: Context object passed to render scripts
+- `TagverseSettings`: Plugin settings interface
+- `DEFAULT_SETTINGS`: Default configuration values
+
+#### `src/core/plugin.ts`
+Main plugin class (`TagversePlugin`):
+- `onload()`: Initialize plugin
+- `onunload()`: Cleanup
+- `processMarkdown()`: Intercept and transform tags
+- `renderDynamicTag()`: Execute render scripts
+- `loadScript()`: Load and cache scripts
+- `refreshActiveView()`: Force re-render
+- Live preview processing with CodeMirror integration
+
+#### `src/core/renderer.ts`
+Abstract base class (`TagRenderer`) for tag rendering:
+- Provides common interface for both rendering modes
+- Handles script execution and result processing
+- Manages error handling and loading states
+- Enforces consistent behavior across renderers
+
+#### `src/core/reading-mode-renderer.ts`
+Reading mode renderer (`ReadingModeRenderer`):
+- Extends TagRenderer for static reading view
+- Direct DOM element replacement
+- Optimized for non-interactive content display
+
+#### `src/core/live-preview-renderer.ts`
+Live preview renderer and widget:
+- `LivePreviewRenderer`: Extends TagRenderer for live editing
+- `TagverseWidget`: CodeMirror WidgetType wrapper
+- Handles dynamic content in editable context
+- Manages loading states and cursor detection
+- Integrates with CodeMirror decoration system
+
+#### `src/settings/settings-tab.ts`
+Settings UI (`TagverseSettingTab`):
+- Tag-script mappings management
+- Add/edit/delete mappings
+- Enable/disable individual mappings
+- General plugin configuration
+
+#### `src/utils/logger.ts`
+Logger utility class with configurable logging levels and convenience methods for plugin debugging and monitoring.
+
+#### `src/constants/index.ts`
+Constants and configuration values for the plugin.
+
+#### `logger.ts` (root level)
+Existing logger utility with comprehensive logging methods for debugging and monitoring.
 
 **Key Technologies**:
-- TypeScript for type safety
-- Obsidian API for vault access
+- TypeScript for type safety with modular architecture
+- Obsidian API for vault access and plugin integration
+- CodeMirror integration for live preview editing
 - MarkdownPostProcessor for tag interception
 - Function constructor for dynamic script execution
 
@@ -192,14 +255,14 @@ Source map for debugging:
 ### 1. Initial Setup
 ```bash
 git clone <repo>
-cd obsidian-dynamic-tag-renderer
+cd obsidian-tagverse
 npm install
 ```
 
 ### 2. Development
 ```bash
 npm run dev  # Starts watch mode
-# Edit main.ts
+# Edit files in src/ directory
 # Changes auto-compile to main.js
 # Copy to test vault and reload Obsidian
 ```
@@ -207,7 +270,7 @@ npm run dev  # Starts watch mode
 ### 3. Testing
 ```bash
 # Copy to test vault
-cp main.js manifest.json styles.css ~/Vault/.obsidian/plugins/dynamic-tag-renderer/
+cp main.js manifest.json styles.css ~/Vault/.obsidian/plugins/tagverse/
 # Reload Obsidian (Ctrl+R)
 # Test features
 ```

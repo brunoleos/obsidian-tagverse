@@ -1,22 +1,22 @@
-# Quick Start Guide - Dynamic Tag Renderer
+# Quick Start Guide - Tagverse
 
-Get started with Dynamic Tag Renderer in 5 minutes!
+Get started with Tagverse in 5 minutes!
 
-## What is Dynamic Tag Renderer?
+## What is Tagverse?
 
 Transform your Obsidian tags into interactive, dynamic content using custom JavaScript. Instead of seeing `#project`, you could see a button, a progress bar, a list of related notes, or anything you can imagine!
 
 ## Installation
 
-### From Community Plugins (Recommended)
+### From Obsidian Community Plugins (Coming Soon)
 1. Open Obsidian Settings
 2. Go to **Community Plugins** → **Browse**
-3. Search for "Dynamic Tag Renderer"
+3. Search for "Tagverse"
 4. Click **Install**, then **Enable**
 
 ### Manual Installation
-1. Download latest release from [GitHub](https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer/releases)
-2. Extract files to `.obsidian/plugins/dynamic-tag-renderer/`
+1. Download latest release from [GitHub](https://github.com/brunoleos/obsidian-tagverse/releases)
+2. Extract files to `.obsidian/plugins/tagverse/`
 3. Reload Obsidian
 4. Enable in Settings → Community Plugins
 
@@ -54,7 +54,7 @@ function render(context) {
 
 ### Step 2: Configure the Plugin
 
-1. Open **Settings** → **Dynamic Tag Renderer**
+1. Open **Settings** → **Tagverse**
 2. Click **Add mapping**
 3. Fill in:
    - **Tag name**: `test` (without #)
@@ -291,8 +291,8 @@ Check the console for errors:
 
 If tags don't update:
 1. Open Command Palette (`Ctrl/Cmd + P`)
-2. Run: "Dynamic Tag Renderer: Refresh dynamic tags in current note"
-3. Or: "Dynamic Tag Renderer: Clear script cache"
+2. Run: "Refresh tagverses in current note"
+3. Or: "Clear script cache"
 
 ## What You Can Access
 
@@ -353,12 +353,31 @@ context.app.internalPlugins.getPluginById('global-search')
 3. **Join Community**: Share your scripts and get help on the forum
 4. **Create Cool Scripts**: Experiment and have fun!
 
+## Project Structure
+
+The plugin uses a modular TypeScript architecture:
+
+```
+src/
+├── types/interfaces.ts      # TypeScript interfaces and types
+├── core/
+│   ├── plugin.ts           # Main plugin class (TagversePlugin)
+│   └── widget.ts           # Widget class (TagverseWidget)
+├── settings/
+│   └── settings-tab.ts     # Settings UI (TagverseSettingTab)
+├── utils/
+│   └── logger.ts           # Logger utility
+├── constants/
+│   └── index.ts            # Constants and configuration
+└── index.ts                # Main exports
+```
+
 ## Need Help?
 
 - 📖 [Full Documentation](DOCUMENTATION.md)
-- 🐛 [Report Issues](https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer/issues)
+- 🐛 [Report Issues](https://github.com/brunoleos/obsidian-tagverse/issues)
 - 💬 [Obsidian Discord](https://discord.gg/obsidianmd)
-- 💡 [Feature Requests](https://github.com/YOUR-USERNAME/obsidian-dynamic-tag-renderer/issues/new)
+- 💡 [Feature Requests](https://github.com/brunoleos/obsidian-tagverse/issues/new)
 
 ---
 

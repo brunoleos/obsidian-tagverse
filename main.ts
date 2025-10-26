@@ -11,60 +11,7 @@ import {
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType, MatchDecorator } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
 import { RangeSetBuilder, StateField } from '@codemirror/state';
-
-// ========== LOGGING UTILITY ==========
-class Logger {
-    private prefix = '[DTR]';
-    private enabled = true;
-
-    private formatMessage(component: string, event: string, data?: any): string {
-        const timestamp = new Date().toISOString().split('T')[1];
-        const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
-        return `${this.prefix} ${timestamp} | ${component} | ${event}${dataStr}`;
-    }
-
-    init(message: string, data?: any) {
-        if (this.enabled) console.log(this.formatMessage('INIT', message, data));
-    }
-
-    debug(component: string, event: string, data?: any) {
-        if (this.enabled) console.log(this.formatMessage(component, event, data));
-    }
-
-    info(component: string, event: string, data?: any) {
-        if (this.enabled) console.info(this.formatMessage(component, event, data));
-    }
-
-    warn(component: string, event: string, data?: any) {
-        if (this.enabled) console.warn(this.formatMessage(component, event, data));
-    }
-
-    error(component: string, event: string, error: any) {
-        if (this.enabled) console.error(this.formatMessage(component, event, { error: error.message || error }));
-    }
-
-    logModeChange(from: string, to: string) {
-        this.info('MODE', 'Changed', { from, to });
-    }
-
-    logTagDecision(tag: string, decision: string, reason: string, details?: any) {
-        this.debug('MATCH', 'Decision', { tag, decision, reason, ...details });
-    }
-
-    logUserAction(action: string, details?: any) {
-        this.info('USER', action, details);
-    }
-
-    logSettings(mappings: TagScriptMapping[]) {
-        this.init('Settings loaded', { mappingCount: mappings.length });
-        mappings.forEach((m, i) => {
-            this.init(`Mapping[${i}]`, { tag: m.tag, script: m.scriptPath, enabled: m.enabled });
-        });
-    }
-}
-
-const logger = new Logger();
-// ========================================
+import { logger } from 'logger';
 
 interface TagScriptMapping {
     tag: string;
@@ -84,11 +31,13 @@ interface ScriptContext {
 interface TagverseSettings {
     tagMappings: TagScriptMapping[];
     refreshOnFileChange: boolean;
+    logLevel: 'debug' | 'info' | 'warning' | 'error';
 }
 
 const DEFAULT_SETTINGS: TagverseSettings = {
     tagMappings: [],
-    refreshOnFileChange: true
+    refreshOnFileChange: true,
+    logLevel: 'error'
 };
 
 class TagverseWidget extends WidgetType {
@@ -103,10 +52,10 @@ class TagverseWidget extends WidgetType {
         private frontmatter: any
     ) {
         super();
-        logger.debug('WIDGET', 'Created', { tag: this.tag, script: this.mapping.scriptPath, source: this.sourcePath });
+        logger.logWidgetLifecycle('Created', { tag: this.tag, script: this.mapping.scriptPath, source: this.sourcePath });
 
         // Create container immediately and start async loading
-        this.container = createSpan({ cls: 'dtr-widget-container' });
+        this.container = createSpan({ cls: 'tagverse-widget-container' });
         this.startLoading();
     }
 
@@ -115,7 +64,7 @@ class TagverseWidget extends WidgetType {
     }
 
     toDOM(): HTMLElement {
-        logger.debug('WIDGET', 'toDOM called', { tag: this.tag, rendered: this.rendered });
+        logger.logWidgetLifecycle('DOM requested', { tag: this.tag, rendered: this.rendered });
         return this.container;
     }
 
@@ -128,24 +77,19 @@ class TagverseWidget extends WidgetType {
 
         // Start async content loading
         this.renderContent().catch(error => {
-            logger.error('WIDGET', 'Loading failed', error);
+            logger.logErrorHandling('Widget loading failed', error);
             this.container.textContent = `[Error: #${this.mapping.tag}]`;
         });
     }
 
     private async renderContent() {
-        // Loading already started in startLoading(), no need to check rendered again
-        console.group(`👁️ [DTR] Live Preview: #${this.tag}`);
+        const startTime = performance.now();
+        logger.startGroup('RENDER-LIVE', 'Live preview render started', { tag: this.tag, script: this.mapping.scriptPath });
 
         try {
-            logger.debug('LIVE-MODE', 'Starting render', {
-                tag: this.tag,
-                script: this.mapping.scriptPath,
-                sourcePath: this.sourcePath
-            });
-
+            logger.logRenderPipeline('Script loading started', { tag: this.tag, script: this.mapping.scriptPath });
             const renderFunction = await this.plugin.loadScript(this.mapping.scriptPath);
-            logger.debug('LIVE-MODE', 'Script loaded', { tag: this.tag });
+            logger.logCacheOperation('Script loaded from cache or file', { tag: this.tag });
 
             // Create a temporary container for the script to render into (not added to DOM)
             const tempContainer = createSpan();
@@ -159,22 +103,25 @@ class TagverseWidget extends WidgetType {
                 Notice: Notice
             };
 
+            logger.logScriptExecution('Script execution started', { tag: this.tag });
             const result = await renderFunction(scriptContext);
 
-            // Log script return value with full HTML
+            // Log script return value comprehensively
             if (result instanceof HTMLElement) {
-                const resultStyle = window.getComputedStyle(result);
-                logger.debug('LIVE-SCRIPT', 'Return value (HTMLElement)', {
+                logger.logScriptExecution('Script returned HTMLElement', {
                     tag: this.tag,
-                    tagName: result.tagName,
-                    className: result.className,
-                    display: resultStyle.display,
-                    position: resultStyle.position
+                    elementType: result.tagName,
+                    hasContent: result.innerHTML.length > 0,
+                    classes: result.className
                 });
-                console.log('📦 Script return innerHTML:', result.innerHTML);
-                console.log('📦 Script return outerHTML:', result.outerHTML);
+            } else if (typeof result === 'string') {
+                logger.logScriptExecution('Script returned string', {
+                    tag: this.tag,
+                    length: result.length,
+                    preview: result.substring(0, 100)
+                });
             } else {
-                logger.debug('LIVE-SCRIPT', 'Return value', {
+                logger.logScriptExecution('Script returned value', {
                     tag: this.tag,
                     type: typeof result,
                     isNull: result === null || result === undefined
@@ -187,51 +134,55 @@ class TagverseWidget extends WidgetType {
             if (result === null || result === undefined) {
                 // Show plain tag if script returns nothing
                 contentElement = createSpan({ text: `#${this.tag}` });
-                logger.debug('LIVE-MODE', 'Output: null/undefined - showing plain tag', { tag: this.tag });
+                logger.logRenderPipeline('Output fallback to plain tag', { tag: this.tag, reason: 'null/undefined result' });
             } else if (typeof result === 'string') {
                 // For string results, create a span and set innerHTML
                 contentElement = createSpan();
                 contentElement.innerHTML = result;
-                logger.debug('LIVE-MODE', 'Output: string HTML - direct return', { tag: this.tag, length: result.length });
-                console.log('📝 String content:', result);
+                logger.logRenderPipeline('Output rendered as HTML string', { tag: this.tag, length: result.length });
             } else if (result instanceof HTMLElement) {
                 // Use inline-block wrapper to contain block content in editor line
-                const wrapper = createSpan({ cls: 'dtr-inline-wrapper' });
+                const wrapper = createSpan({ cls: 'tagverse-inline-wrapper' });
                 wrapper.style.display = 'inline-block';
                 wrapper.style.verticalAlign = 'top';
                 wrapper.style.maxWidth = '100%';
                 wrapper.style.overflow = 'visible';
                 wrapper.appendChild(result);
                 contentElement = wrapper;
-                logger.debug('LIVE-MODE', 'Output: HTMLElement - inline wrapper for block content', { tag: this.tag, element: result.tagName });
+                logger.logRenderPipeline('Output wrapped in inline container', { tag: this.tag, elementType: result.tagName });
             } else {
                 // Show error if output type is invalid
                 contentElement = createSpan({
-                    cls: 'dynamic-tag-error',
+                    cls: 'tagverse-error',
                     text: `[Invalid output for #${this.mapping.tag}]`
                 });
-                logger.warn('LIVE-MODE', 'Invalid output type', { tag: this.tag, type: typeof result });
+                logger.warn('RENDER-LIVE', 'Invalid output type', { tag: this.tag, type: typeof result });
             }
 
             // Update the widget container
             this.container.innerHTML = '';
             this.container.appendChild(contentElement);
 
-            logger.debug('LIVE-MODE', 'Render complete', { tag: this.tag });
+            const duration = performance.now() - startTime;
+            logger.logPerformance('Live preview render completed', duration, { tag: this.tag });
+            logger.logRenderPipeline('Render completed successfully', { tag: this.tag });
 
         } catch (error) {
-            logger.error('LIVE-MODE', 'Rendering failed', error);
+            const duration = performance.now() - startTime;
+            logger.logPerformance('Live preview render failed', duration, { tag: this.tag });
+            logger.logErrorHandling('Live preview rendering failed', error);
+
             this.plugin.app.workspace.onLayoutReady(() => {
                 new Notice(`Error rendering tag #${this.mapping.tag}: ${error.message}`);
             });
             // Update container with error message
             this.container.innerHTML = '';
             this.container.appendChild(createSpan({
-                cls: 'dynamic-tag-error',
+                cls: 'tagverse-error',
                 text: `[Error: #${this.mapping.tag}]`
             }));
         } finally {
-            console.groupEnd();
+            logger.endGroup();
         }
     }
 }
@@ -243,22 +194,24 @@ export default class TagversePlugin extends Plugin {
     private scriptCache: Map<string, Function> = new Map();
 
     async onload() {
-        logger.init('Plugin loading...');
+        const startTime = performance.now();
+        logger.logPluginInit('Plugin initialization started');
+
         TagversePluginInstance = this;
         await this.loadSettings();
+        logger.logPluginInit('Settings loaded', { refreshOnFileChange: this.settings.refreshOnFileChange, logLevel: this.settings.logLevel });
 
         // Register markdown post processor for reading mode
         this.registerMarkdownPostProcessor(this.processMarkdown.bind(this));
-        logger.debug('INIT', 'Registered markdown post processor');
+        logger.logPluginInit('Markdown post processor registered');
 
         // Register live preview processor (source mode will show plain text)
         this.registerLivePreviewProcessor();
-        logger.debug('INIT', 'Registered live preview processor');
+        logger.logPluginInit('Live preview processor registered');
 
         // Register event for file changes if enabled
         this.registerEvent(
             this.app.workspace.on('file-open', (file) => {
-                logger.info('WORKSPACE', 'File opened', { path: file?.path });
                 if (this.settings.refreshOnFileChange) {
                     this.refreshActiveView();
                 }
@@ -271,11 +224,7 @@ export default class TagversePlugin extends Plugin {
                 if (leaf && leaf.view.getViewType() === 'markdown') {
                     const view = leaf.view as MarkdownView;
                     const mode = view.getMode();
-                    logger.info('WORKSPACE', 'Active leaf changed', { 
-                        viewType: view.getViewType(), 
-                        mode: mode 
-                    });
-                    
+
                     // Inspect DOM when view changes
                     this.inspectDOMState(mode);
                 }
@@ -285,8 +234,6 @@ export default class TagversePlugin extends Plugin {
         // Register workspace event for layout changes
         this.registerEvent(
             this.app.workspace.on('layout-change', () => {
-                logger.info('WORKSPACE', 'Layout changed');
-                
                 // Inspect DOM state after layout change
                 setTimeout(() => {
                     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -300,13 +247,14 @@ export default class TagversePlugin extends Plugin {
 
         // Add settings tab
         this.addSettingTab(new TagverseSettingTab(this.app, this));
+        logger.logPluginInit('Settings tab added');
 
         // Add command to refresh current view
         this.addCommand({
             id: 'refresh-dynamic-tags',
             name: 'Refresh tagverses in current note',
             callback: () => {
-                logger.logUserAction('Command: Refresh tagverses');
+                logger.logUserAction('Refresh tagverses command executed');
                 this.refreshActiveView();
                 new Notice('Tagverses refreshed');
             }
@@ -317,13 +265,15 @@ export default class TagversePlugin extends Plugin {
             id: 'clear-script-cache',
             name: 'Clear script cache',
             callback: () => {
-                logger.logUserAction('Command: Clear script cache');
+                logger.logUserAction('Clear script cache command executed');
                 this.scriptCache.clear();
                 new Notice('Script cache cleared');
             }
         });
 
-        logger.init('Plugin loaded successfully');
+        const duration = performance.now() - startTime;
+        logger.logPerformance('Plugin initialization completed', duration);
+        logger.logPluginInit('Plugin loaded successfully');
     }
 
     onunload() {
@@ -334,11 +284,16 @@ export default class TagversePlugin extends Plugin {
 
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-        logger.logSettings(this.settings.tagMappings);
+        logger.setLogLevel(this.settings.logLevel);
+        logger.logPluginInit('Settings loaded', { mappingCount: this.settings.tagMappings.length });
+        this.settings.tagMappings.forEach((m, i) => {
+            logger.logPluginInit(`Mapping configured`, { index: i, tag: m.tag, script: m.scriptPath, enabled: m.enabled });
+        });
     }
 
     async saveSettings() {
         await this.saveData(this.settings);
+        logger.setLogLevel(this.settings.logLevel);
         this.scriptCache.clear(); // Clear cache when settings change
         this.refreshActiveView();
     }
@@ -347,30 +302,35 @@ export default class TagversePlugin extends Plugin {
         element: HTMLElement,
         context: MarkdownPostProcessorContext
     ) {
-        logger.debug('READING', 'Processing markdown', { sourcePath: context.sourcePath });
-        
+        logger.logRenderPipeline('Markdown processing started', { sourcePath: context.sourcePath });
+
         // Find all tag elements in the markdown
         const tagElements = element.findAll('a.tag');
-        logger.debug('READING', 'Tags found', { count: tagElements.length });
-        
+        logger.logRenderPipeline('Tags discovered in markdown', { count: tagElements.length, sourcePath: context.sourcePath });
+
         for (const tagEl of tagElements) {
             const tagText = tagEl.getAttribute('data-tag-name') || tagEl.textContent?.replace('#', '');
             if (!tagText) continue;
-            
-            logger.debug('READING', 'Processing tag', { tag: tagText });
-            
+
+            logger.startGroup('TAG-PROCESSING', 'Processing individual tag', { tag: tagText, sourcePath: context.sourcePath });
+            logger.logTagMatching('Tag processing started', { tag: tagText, sourcePath: context.sourcePath });
+
             // Case-insensitive tag matching
             const mapping = this.settings.tagMappings.find(
                 m => m.enabled && m.tag.toLowerCase() === tagText.toLowerCase()
             );
 
             if (mapping) {
-                logger.debug('READING', 'Mapping found', { tag: tagText, script: mapping.scriptPath });
+                logger.logTagMatching('Mapping found, rendering tag', { tag: tagText, script: mapping.scriptPath });
                 await this.renderDynamicTag(tagEl, mapping, context);
             } else {
-                logger.debug('READING', 'No mapping found', { tag: tagText });
+                logger.logTagMatching('No mapping found, skipping tag', { tag: tagText });
             }
+
+            logger.endGroup();
         }
+
+        logger.logRenderPipeline('Markdown processing completed', { sourcePath: context.sourcePath });
     }
 
     private async renderDynamicTag(
@@ -378,18 +338,13 @@ export default class TagversePlugin extends Plugin {
         mapping: TagScriptMapping,
         context: MarkdownPostProcessorContext
     ) {
-        console.group(`📖 [DTR] Reading Mode: #${mapping.tag}`);
+        const startTime = performance.now();
+        logger.startGroup('RENDER-READING', 'Reading mode render started', { tag: mapping.tag, script: mapping.scriptPath });
 
         try {
-            logger.debug('READING-MODE', 'Starting render', {
-                tag: mapping.tag,
-                script: mapping.scriptPath,
-                sourcePath: context.sourcePath
-            });
-
-            // Load and execute the script
+            logger.logRenderPipeline('Script loading started', { tag: mapping.tag, script: mapping.scriptPath, sourcePath: context.sourcePath });
             const renderFunction = await this.loadScript(mapping.scriptPath);
-            logger.debug('READING-MODE', 'Script loaded', { tag: mapping.tag });
+            logger.logCacheOperation('Script loaded from cache or file', { tag: mapping.tag });
 
             // Create a temporary container for the script to render into (not added to DOM)
             const tempContainer = createSpan();
@@ -404,23 +359,25 @@ export default class TagversePlugin extends Plugin {
                 Notice: Notice
             };
 
-            // Execute the render function
+            logger.logScriptExecution('Script execution started', { tag: mapping.tag });
             const result = await renderFunction(scriptContext);
 
-            // Log script return value with full HTML
+            // Log script return value comprehensively
             if (result instanceof HTMLElement) {
-                const resultStyle = window.getComputedStyle(result);
-                logger.debug('READING-SCRIPT', 'Return value (HTMLElement)', {
+                logger.logScriptExecution('Script returned HTMLElement', {
                     tag: mapping.tag,
-                    tagName: result.tagName,
-                    className: result.className,
-                    display: resultStyle.display,
-                    position: resultStyle.position
+                    elementType: result.tagName,
+                    hasContent: result.innerHTML.length > 0,
+                    classes: result.className
                 });
-                console.log('📦 Script return innerHTML:', result.innerHTML);
-                console.log('📦 Script return outerHTML:', result.outerHTML);
+            } else if (typeof result === 'string') {
+                logger.logScriptExecution('Script returned string', {
+                    tag: mapping.tag,
+                    length: result.length,
+                    preview: result.substring(0, 100)
+                });
             } else {
-                logger.debug('READING-SCRIPT', 'Return value', {
+                logger.logScriptExecution('Script returned value', {
                     tag: mapping.tag,
                     type: typeof result,
                     isNull: result === null || result === undefined
@@ -433,64 +390,73 @@ export default class TagversePlugin extends Plugin {
             if (result === null || result === undefined) {
                 // Show original tag if script returns nothing
                 wrapper.appendChild(tagEl.cloneNode(true));
-                logger.debug('READING-MODE', 'Output: null/undefined - showing original tag', { tag: mapping.tag });
+                logger.logRenderPipeline('Output fallback to original tag', { tag: mapping.tag, reason: 'null/undefined result' });
             } else if (typeof result === 'string') {
                 // For string results, create a span and set innerHTML
                 const stringEl = createSpan();
                 stringEl.innerHTML = result;
                 wrapper.appendChild(stringEl);
-                logger.debug('READING-MODE', 'Output: string HTML - wrapped', { tag: mapping.tag, length: result.length });
-                console.log('📝 String content:', result);
+                logger.logRenderPipeline('Output rendered as HTML string', { tag: mapping.tag, length: result.length });
             } else if (result instanceof HTMLElement) {
                 // Wrap script output in transparent container for editor compatibility
                 wrapper.appendChild(result);
-                logger.debug('READING-MODE', 'Output: HTMLElement - wrapped', { tag: mapping.tag, element: result.tagName });
+                logger.logRenderPipeline('Output wrapped in container', { tag: mapping.tag, elementType: result.tagName });
             } else {
                 // Show error if output type is invalid
-                const errorEl = createSpan({
-                    cls: 'dynamic-tag-error',
-                    text: `[Invalid output for #${mapping.tag}]`
-                });
+            const errorEl = createSpan({
+                cls: 'tagverse-error',
+                text: `[Invalid output for #${mapping.tag}]`
+            });
                 wrapper.appendChild(errorEl);
-                logger.warn('READING-MODE', 'Invalid output type', { tag: mapping.tag, type: typeof result });
+                logger.warn('RENDER-READING', 'Invalid output type', { tag: mapping.tag, type: typeof result });
             }
 
             tagEl.replaceWith(wrapper);
 
-            logger.debug('READING-MODE', 'Render complete', { tag: mapping.tag });
+            const duration = performance.now() - startTime;
+            logger.logPerformance('Reading mode render completed', duration, { tag: mapping.tag });
+            logger.logRenderPipeline('Render completed successfully', { tag: mapping.tag });
 
         } catch (error) {
-            logger.error('READING-MODE', 'Rendering failed', error);
+            const duration = performance.now() - startTime;
+            logger.logPerformance('Reading mode render failed', duration, { tag: mapping.tag });
+            logger.logErrorHandling('Reading mode rendering failed', error);
+
             // Use Notice for user feedback instead of console.error
             new Notice(`Error rendering tag #${mapping.tag}: ${error.message}`);
             const errorEl = createSpan({
-                cls: 'dynamic-tag-error',
+                cls: 'tagverse-error',
                 text: `[Error: #${mapping.tag}]`
             });
             tagEl.replaceWith(errorEl);
         } finally {
-            console.groupEnd();
+            logger.endGroup();
         }
     }
 
     async loadScript(scriptPath: string): Promise<Function> {
+        const startTime = performance.now();
+
         // Check cache first
         if (this.scriptCache.has(scriptPath)) {
+            logger.logCacheOperation('Cache hit', { script: scriptPath });
             return this.scriptCache.get(scriptPath)!;
         }
+
+        logger.logCacheOperation('Cache miss, loading from file', { script: scriptPath });
 
         // Load the script file
         const file = this.app.vault.getAbstractFileByPath(scriptPath);
 
         if (!file || !(file instanceof TFile)) {
+            logger.logErrorHandling('Script file not found', { script: scriptPath, fileType: typeof file });
             throw new Error(`Script file not found or not a file: ${scriptPath}`);
         }
 
-        const scriptContent = await this.app.vault.read(file);
-
-        // Create a function from the script content
-        // The script should export a render function
         try {
+            const scriptContent = await this.app.vault.read(file);
+            logger.logCacheOperation('Script file read successfully', { script: scriptPath, contentLength: scriptContent.length });
+
             // Wrap in async function to support await
             const wrappedScript = `
                 return (async function(context) {
@@ -507,13 +473,20 @@ export default class TagversePlugin extends Plugin {
             `;
 
             const scriptFunction = new Function(wrappedScript)();
+            logger.logCacheOperation('Script function created', { script: scriptPath });
 
             // Cache the function
             this.scriptCache.set(scriptPath, scriptFunction);
+            logger.logCacheOperation('Script cached', { script: scriptPath });
+
+            const duration = performance.now() - startTime;
+            logger.logPerformance('Script loading completed', duration, { script: scriptPath });
 
             return scriptFunction;
         } catch (error) {
-            // Provide more detailed error information
+            const duration = performance.now() - startTime;
+            logger.logPerformance('Script loading failed', duration, { script: scriptPath });
+            logger.logErrorHandling('Script loading failed', error);
             throw new Error(`Failed to load script "${scriptPath}": ${error.message}`);
         }
     }
@@ -543,9 +516,23 @@ export default class TagversePlugin extends Plugin {
                 const tagLength = match[0].length;
                 const cursor = view.state.selection.main.head;
 
+                logger.startGroup(`MATCH-${tag}`, 'Tag match processing', { tag, pos, cursor });
+
                 logger.debug('MATCH', 'Tag found', { tag, pos, length: tagLength, cursor });
 
-                // Check mode
+                // First priority: Check if this tag has a mapping (most expensive check - do early)
+                const mapping = this.settings.tagMappings.find(
+                    m => m.enabled && m.tag.toLowerCase() === tag.toLowerCase()
+                );
+
+                // For unmapped tags: immediately exit (most common case - optimize for this!)
+                if (!mapping) {
+                    logger.logTagMatching('Decision made', { tag, decision: 'NULL', reason: 'no mapping found', pos });
+                    logger.endGroup();
+                    return null; // Let Obsidian handle natively
+                }
+
+                // For mapped tags only: check expensive cursor/mode conditions
                 const isLivePreview = isEditorInLivePreviewMode(view);
                 logger.debug('MATCH', 'Mode check', { tag, isLivePreview });
 
@@ -554,37 +541,28 @@ export default class TagversePlugin extends Plugin {
                 const selectionContains = isSelectionContainsTag(view, pos, tagLength);
                 logger.debug('MATCH', 'Cursor check', { tag, cursorInside, selectionContains, cursor, start: pos, end: pos + tagLength });
 
-                // Check if this tag has a mapping
-                const mapping = this.settings.tagMappings.find(
-                    m => m.enabled && m.tag.toLowerCase() === tag.toLowerCase()
-                );
-
                 // When cursor is inside tag (in live preview), show natively for editing
                 if (isLivePreview && cursorInside) {
-                    logger.logTagDecision(tag, 'NULL', 'cursor inside (show natively)', { pos, cursor });
+                    logger.logTagMatching('Decision made', { tag, decision: 'NULL', reason: 'cursor inside (show natively)', pos, cursor });
+                    logger.endGroup();
                     return null; // Let Obsidian handle natively - no decoration
                 }
 
                 // In live preview, always show widgets for mapped tags when cursor is outside
-                if (mapping) {
-                    logger.logTagDecision(tag, 'REPLACE', 'widget', { pos, script: mapping.scriptPath });
-                    
-                    // Get frontmatter from the current file
-                    const file = this.app.workspace.getActiveFile();
-                    let frontmatter = {};
-                    if (file) {
-                        const cache = this.app.metadataCache.getFileCache(file);
-                        frontmatter = cache?.frontmatter || {};
-                    }
+                logger.logTagMatching('Decision made', { tag, decision: 'REPLACE', reason: 'widget', pos, script: mapping.scriptPath });
 
-                    return Decoration.replace({
-                        widget: new TagverseWidget(this, tag, mapping, file?.path || '', frontmatter),
-                    });
+                // Get frontmatter from the current file
+                const file = this.app.workspace.getActiveFile();
+                let frontmatter = {};
+                if (file) {
+                    const cache = this.app.metadataCache.getFileCache(file);
+                    frontmatter = cache?.frontmatter || {};
                 }
 
-                // Unmapped tags in live preview: return null for native styling
-                logger.logTagDecision(tag, 'NULL', 'no mapping found', { pos });
-                return null;
+                logger.endGroup();
+                return Decoration.replace({
+                    widget: new TagverseWidget(this, tag, mapping, file?.path || '', frontmatter),
+                });
             }
         });
 
@@ -641,7 +619,7 @@ export default class TagversePlugin extends Plugin {
                 });
 
                 // Log DOM state - check for script elements (no longer using containers)
-                const scriptElements = view.dom.querySelectorAll('[class*="stress-"], [class*="dynamic-tag-error"]');
+                const scriptElements = view.dom.querySelectorAll('[class*="stress-"], [class*="tagverse-error"]');
                 logger.debug('DOM-STATE', context, {
                     scriptElementsFound: scriptElements.length,
                     editorClasses: view.dom.className
@@ -690,138 +668,13 @@ export default class TagversePlugin extends Plugin {
 
 
     private inspectDOMState(mode: string) {
-        console.group(`🔍 [DTR] DOM Inspection - ${mode.toUpperCase()} mode`);
+        // DOM inspection - only find elements without logging
+        const scriptElements = document.querySelectorAll('[class*="stress-"], [class*="tagverse-error"]');
 
-        try {
-            // Find all script-generated elements (no longer using wrapper containers)
-            const scriptElements = document.querySelectorAll('[class*="stress-"], [class*="dynamic-tag-error"]');
-            logger.info('DOM-INSPECT', 'Script elements found', { mode, count: scriptElements.length });
-
-            // Log theme and CSS information
-            console.log('🎨 Active theme:', this.getActiveTheme());
-            console.log('🎨 Applied stylesheets:', Array.from(document.styleSheets).map((sheet, i) => ({
-                index: i,
-                href: sheet.href || 'inline',
-                title: sheet.title || 'no-title',
-                rules: sheet.cssRules?.length || 0
-            })));
-
-            scriptElements.forEach((element, index) => {
-                const htmlElement = element as HTMLElement;
-                const computedStyle = window.getComputedStyle(htmlElement);
-
-                // Get the tag name from the content
-                const contentPreview = htmlElement.textContent?.substring(0, 50) || '';
-
-                logger.debug('DOM-INSPECT', `Element[${index}]`, {
-                    mode,
-                    tagName: htmlElement.tagName,
-                    className: htmlElement.className,
-                    display: computedStyle.display,
-                    position: computedStyle.position,
-                    width: computedStyle.width,
-                    height: computedStyle.height,
-                    float: computedStyle.float,
-                    verticalAlign: computedStyle.verticalAlign,
-                    margin: computedStyle.margin,
-                    padding: computedStyle.padding,
-                    lineHeight: computedStyle.lineHeight,
-                    fontSize: computedStyle.fontSize,
-                    whiteSpace: computedStyle.whiteSpace,
-                    wordWrap: computedStyle.wordWrap,
-                    overflow: computedStyle.overflow,
-                    contentPreview
-                });
-
-                console.log(`📦 Element[${index}] innerHTML:`, htmlElement.innerHTML);
-                console.log(`📦 Element[${index}] outerHTML:`, htmlElement.outerHTML);
-
-                // Log computed styles for all elements in the hierarchy
-                this.logElementStyles(htmlElement, index, mode);
-
-                // Log parent chain with detailed styles
-                let parent = htmlElement.parentElement;
-                let level = 1;
-                const parentChain: string[] = [];
-                while (parent && level <= 5) { // Increased depth
-                    const parentStyle = window.getComputedStyle(parent);
-                    parentChain.push(`${parent.tagName}.${parent.className || '(no class)'}`);
-                    logger.debug('DOM-INSPECT', `Element[${index}] Parent[${level}]`, {
-                        tag: parent.tagName,
-                        className: parent.className,
-                        display: parentStyle.display,
-                        position: parentStyle.position,
-                        width: parentStyle.width,
-                        height: parentStyle.height,
-                        margin: parentStyle.margin,
-                        padding: parentStyle.padding,
-                        lineHeight: parentStyle.lineHeight,
-                        fontSize: parentStyle.fontSize
-                    });
-                    parent = parent.parentElement;
-                    level++;
-                }
-                console.log(`🔗 Element[${index}] Parent chain:`, parentChain.join(' → '));
-            });
-
-            if (scriptElements.length === 0) {
-                logger.warn('DOM-INSPECT', 'No script elements found', { mode });
-            }
-
-        } catch (error) {
-            logger.error('DOM-INSPECT', 'Inspection failed', error);
-        } finally {
-            console.groupEnd();
-        }
+        // No longer logging DOM inspection details - functionality remains internal
     }
 
-    private getActiveTheme(): string {
-        // Try to detect the active theme
-        const bodyClasses = document.body.className;
-        if (bodyClasses.includes('theme-dark')) return 'Dark';
-        if (bodyClasses.includes('theme-light')) return 'Light';
-        return 'Unknown';
-    }
 
-    private logElementStyles(element: HTMLElement, containerIndex: number, mode: string) {
-        console.group(`🎨 Container[${containerIndex}] Style Analysis`);
-
-        try {
-            // Log all child elements and their computed styles
-            const allElements = element.querySelectorAll('*');
-            const elements = [element, ...Array.from(allElements)];
-
-            elements.forEach((el, elIndex) => {
-                const htmlEl = el as HTMLElement;
-                const style = window.getComputedStyle(htmlEl);
-
-                // Only log elements that might affect layout
-                if (elIndex === 0 || style.display !== 'inline' || htmlEl.children.length > 0) {
-                    console.log(`  ${elIndex === 0 ? '📦 Container' : `  ${htmlEl.tagName}.${htmlEl.className || '(no class)'}`}:`, {
-                        display: style.display,
-                        position: style.position,
-                        width: style.width,
-                        height: style.height,
-                        margin: style.margin,
-                        padding: style.padding,
-                        lineHeight: style.lineHeight,
-                        fontSize: style.fontSize,
-                        whiteSpace: style.whiteSpace,
-                        wordWrap: style.wordWrap,
-                        overflow: style.overflow,
-                        flexDirection: style.flexDirection,
-                        alignItems: style.alignItems,
-                        justifyContent: style.justifyContent
-                    });
-                }
-            });
-
-        } catch (error) {
-            console.error('Style analysis failed:', error);
-        } finally {
-            console.groupEnd();
-        }
-    }
 
     private refreshActiveView() {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -862,6 +715,21 @@ class TagverseSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.refreshOnFileChange)
                 .onChange(async (value) => {
                     this.plugin.settings.refreshOnFileChange = value;
+                    await this.plugin.saveSettings();
+                })
+            );
+
+        new Setting(containerEl)
+            .setName('Log Level')
+            .setDesc('Set the verbosity of logging. Default is Error.')
+            .addDropdown(dropdown => dropdown
+                .addOption('debug', 'Debug')
+                .addOption('info', 'Info')
+                .addOption('warning', 'Warning')
+                .addOption('error', 'Error')
+                .setValue(this.plugin.settings.logLevel)
+                .onChange(async (value) => {
+                    this.plugin.settings.logLevel = value as 'debug' | 'info' | 'warning' | 'error';
                     await this.plugin.saveSettings();
                 })
             );

@@ -77,8 +77,8 @@ Plugin metadata for Obsidian:
 
 #### `styles.css`
 Visual styling for:
-- `.dynamic-tag-container`: Rendered tag container
-- `.dynamic-tag-error`: Error display
+- `.tagverse-widget-container`: Rendered tag container
+- `.tagverse-error`: Error display
 - `.dynamic-tag-mapping`: Settings UI items
 
 ### Configuration Files

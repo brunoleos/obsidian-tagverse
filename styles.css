@@ -1,6 +1,6 @@
 /* Dynamic Tag Renderer - Error styling only */
 
-.dynamic-tag-error {
+.tagverse-error {
     color: var(--text-error);
     background: var(--background-modifier-error);
     padding: 2px 6px;
@@ -10,7 +10,7 @@
 }
 
 /* Reset CodeMirror contenteditable styles to match reading view behavior */
-.dtr-widget-container {
+.tagverse-widget-container {
     white-space: normal !important;
     word-break: normal !important;
     overflow-wrap: break-word !important;

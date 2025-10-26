@@ -10,7 +10,7 @@ export class Logger {
     private logLevel: 'debug' | 'info' | 'warning' | 'error' = 'error';
     private groupStack: string[] = [];
 
-    private formatMessage(component: string, event: string, data?: any): string {
+    private formatMessageLazily(component: string, event: string, data?: any): string {
         const timestamp = new Date().toISOString().split('T')[1];
         const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
         return `${this.prefix} ${timestamp} | ${component} | ${event}${dataStr}`;
@@ -28,7 +28,7 @@ export class Logger {
     private log(level: 'debug' | 'info' | 'warning' | 'error', component: string, event: string, data?: any) {
         if (!this.shouldLog(level)) return;
 
-        const message = this.formatMessage(component, event, data);
+        const message = this.formatMessageLazily(component, event, data);
         switch (level) {
             case 'debug':
                 console.log(message);
@@ -64,7 +64,7 @@ export class Logger {
     // Grouped logging methods that respect log levels
     startGroup(component: string, event: string, data?: any) {
         if (this.shouldLog('debug')) {
-            const message = this.formatMessage(component, event, data);
+            const message = this.formatMessageLazily(component, event, data);
             console.group(message);
             this.groupStack.push(`${component}:${event}`);
         }
@@ -102,21 +102,13 @@ export class Logger {
         this.debug('TAG-MATCH', event, data);
     }
 
-
-
     logUserAction(event: string, data?: any) {
         this.info('USER-ACTION', event, data);
     }
 
-    logErrorHandling(event: string, error: any) {
+    logErrorHandling(event: string, error?: any) {
         this.error('ERROR-HANDLING', event, error);
     }
-
-    logPerformance(event: string, duration: number, data?: any) {
-        this.debug('PERFORMANCE', event, { duration: `${duration}ms`, ...data });
-    }
-
-
 }
 
 export const logger = new Logger();

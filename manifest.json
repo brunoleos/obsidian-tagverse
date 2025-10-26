@@ -1,9 +1,9 @@
 {
-    "id": "dynamic-tag-renderer",
-    "name": "Dynamic Tag Renderer",
+    "id": "tagverse",
+    "name": "Tagverse",
     "version": "1.0.0",
     "minAppVersion": "0.15.0",
-    "description": "Dynamically render tags with custom JavaScript scripts. Transform tags into interactive content using your own render functions.",
+    "description": "Transform tags into interactive universes. Each #tag becomes a portal to rich JavaScript-powered content - buttons, charts, forms, and infinite possibilities.",
     "author": "brunoleos",
     "authorUrl": "https://github.com/brunoleos",
     "fundingUrl": "https://github.com/sponsors/brunoleos",

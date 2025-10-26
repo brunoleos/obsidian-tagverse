@@ -81,22 +81,22 @@ interface ScriptContext {
     Notice: typeof Notice;
 }
 
-interface DynamicTagRendererSettings {
+interface TagverseSettings {
     tagMappings: TagScriptMapping[];
     refreshOnFileChange: boolean;
 }
 
-const DEFAULT_SETTINGS: DynamicTagRendererSettings = {
+const DEFAULT_SETTINGS: TagverseSettings = {
     tagMappings: [],
     refreshOnFileChange: true
 };
 
-class DynamicTagWidget extends WidgetType {
-    private container: HTMLElement | null = null;
+class TagverseWidget extends WidgetType {
+    private container: HTMLElement;
     private rendered = false;
 
     constructor(
-        private plugin: DynamicTagRendererPlugin,
+        private plugin: TagversePlugin,
         private tag: string,
         private mapping: TagScriptMapping,
         private sourcePath: string,
@@ -104,68 +104,50 @@ class DynamicTagWidget extends WidgetType {
     ) {
         super();
         logger.debug('WIDGET', 'Created', { tag: this.tag, script: this.mapping.scriptPath, source: this.sourcePath });
-        this.container = createSpan({ cls: 'dynamic-tag-container' });
-        this.container.innerHTML = `Loading #${this.tag}...`;
+
+        // Create container immediately and start async loading
+        this.container = createSpan({ cls: 'dtr-widget-container' });
+        this.startLoading();
     }
 
-    eq(other: DynamicTagWidget): boolean {
+    eq(other: TagverseWidget): boolean {
         return other.tag === this.tag && other.sourcePath === this.sourcePath;
     }
 
     toDOM(): HTMLElement {
         logger.debug('WIDGET', 'toDOM called', { tag: this.tag, rendered: this.rendered });
-        
-        // Log container details
-        if (this.container) {
-            const computedStyle = window.getComputedStyle(this.container);
-            logger.debug('WIDGET-DOM', 'Container details', {
-                tag: this.tag,
-                classes: this.container.className,
-                display: computedStyle.display,
-                position: computedStyle.position,
-                innerHTML: this.container.innerHTML.substring(0, 100)
-            });
-        }
-        
-        if (!this.rendered) {
-            this.renderContent();
-        }
-        
-        // Log after rendering queued
-        setTimeout(() => {
-            if (this.container) {
-                const computedStyle = window.getComputedStyle(this.container);
-                logger.debug('WIDGET-DOM', 'After render', {
-                    tag: this.tag,
-                    display: computedStyle.display,
-                    position: computedStyle.position,
-                    width: computedStyle.width,
-                    height: computedStyle.height,
-                    outerHTML: this.container.outerHTML.substring(0, 200)
-                });
-            }
-        }, 100);
-        
-        return this.container!;
+        return this.container;
     }
 
-    private async renderContent() {
+    private startLoading() {
         if (this.rendered) return;
         this.rendered = true;
 
+        // Show loading state initially
+        this.container.textContent = `Loading #${this.tag}...`;
+
+        // Start async content loading
+        this.renderContent().catch(error => {
+            logger.error('WIDGET', 'Loading failed', error);
+            this.container.textContent = `[Error: #${this.mapping.tag}]`;
+        });
+    }
+
+    private async renderContent() {
+        // Loading already started in startLoading(), no need to check rendered again
         console.group(`👁️ [DTR] Live Preview: #${this.tag}`);
 
         try {
-            logger.debug('LIVE-MODE', 'Starting render', { 
-                tag: this.tag, 
+            logger.debug('LIVE-MODE', 'Starting render', {
+                tag: this.tag,
                 script: this.mapping.scriptPath,
-                sourcePath: this.sourcePath 
+                sourcePath: this.sourcePath
             });
 
             const renderFunction = await this.plugin.loadScript(this.mapping.scriptPath);
             logger.debug('LIVE-MODE', 'Script loaded', { tag: this.tag });
 
-            // Create a temporary container for the script to render into
+            // Create a temporary container for the script to render into (not added to DOM)
             const tempContainer = createSpan();
 
             const scriptContext: ScriptContext = {
@@ -178,7 +160,7 @@ class DynamicTagWidget extends WidgetType {
             };
 
             const result = await renderFunction(scriptContext);
-            
+
             // Log script return value with full HTML
             if (result instanceof HTMLElement) {
                 const resultStyle = window.getComputedStyle(result);
@@ -192,58 +174,48 @@ class DynamicTagWidget extends WidgetType {
                 console.log('📦 Script return innerHTML:', result.innerHTML);
                 console.log('📦 Script return outerHTML:', result.outerHTML);
             } else {
-                logger.debug('LIVE-SCRIPT', 'Return value', { 
-                    tag: this.tag, 
+                logger.debug('LIVE-SCRIPT', 'Return value', {
+                    tag: this.tag,
                     type: typeof result,
                     isNull: result === null || result === undefined
                 });
             }
 
-            // Clear any content added by the script
-            this.container!.innerHTML = '';
+            // Output validation and fallback - update container directly
+            let contentElement: HTMLElement;
 
-            // Output validation and fallback
             if (result === null || result === undefined) {
-                this.container!.innerHTML = `#${this.tag}`;
+                // Show plain tag if script returns nothing
+                contentElement = createSpan({ text: `#${this.tag}` });
                 logger.debug('LIVE-MODE', 'Output: null/undefined - showing plain tag', { tag: this.tag });
             } else if (typeof result === 'string') {
-                this.container!.innerHTML = result;
-                logger.debug('LIVE-MODE', 'Output: string HTML', { tag: this.tag, length: result.length });
+                // For string results, create a span and set innerHTML
+                contentElement = createSpan();
+                contentElement.innerHTML = result;
+                logger.debug('LIVE-MODE', 'Output: string HTML - direct return', { tag: this.tag, length: result.length });
                 console.log('📝 String content:', result);
             } else if (result instanceof HTMLElement) {
-                this.container!.appendChild(result);
-                
-                // Log after appending
-                const resultStyle = window.getComputedStyle(result);
-                logger.debug('LIVE-SCRIPT', 'After append to container', {
-                    tag: this.tag,
-                    display: resultStyle.display,
-                    position: resultStyle.position,
-                    parentDisplay: window.getComputedStyle(this.container!).display
-                });
-                
-                logger.debug('LIVE-MODE', 'Output: HTMLElement appended', { tag: this.tag, element: result.tagName });
+                // Use inline-block wrapper to contain block content in editor line
+                const wrapper = createSpan({ cls: 'dtr-inline-wrapper' });
+                wrapper.style.display = 'inline-block';
+                wrapper.style.verticalAlign = 'top';
+                wrapper.style.maxWidth = '100%';
+                wrapper.style.overflow = 'visible';
+                wrapper.appendChild(result);
+                contentElement = wrapper;
+                logger.debug('LIVE-MODE', 'Output: HTMLElement - inline wrapper for block content', { tag: this.tag, element: result.tagName });
             } else {
-                this.container!.innerHTML = `[Invalid output for #${this.mapping.tag}]`;
+                // Show error if output type is invalid
+                contentElement = createSpan({
+                    cls: 'dynamic-tag-error',
+                    text: `[Invalid output for #${this.mapping.tag}]`
+                });
                 logger.warn('LIVE-MODE', 'Invalid output type', { tag: this.tag, type: typeof result });
             }
 
-            // Ensure the container displays inline and doesn't break the line
-            this.container!.style.display = 'inline-block';
-            this.container!.style.verticalAlign = 'baseline';
-            this.container!.style.margin = '0 2px';
-
-            // Log final container state with full HTML
-            const finalContainerStyle = window.getComputedStyle(this.container!);
-            logger.debug('LIVE-FINAL', 'After inline styles set', {
-                tag: this.tag,
-                containerDisplay: finalContainerStyle.display,
-                containerPosition: finalContainerStyle.position,
-                width: finalContainerStyle.width,
-                height: finalContainerStyle.height
-            });
-            console.log('✅ Final container innerHTML:', this.container!.innerHTML);
-            console.log('✅ Final container outerHTML:', this.container!.outerHTML);
+            // Update the widget container
+            this.container.innerHTML = '';
+            this.container.appendChild(contentElement);
 
             logger.debug('LIVE-MODE', 'Render complete', { tag: this.tag });
 
@@ -252,24 +224,27 @@ class DynamicTagWidget extends WidgetType {
             this.plugin.app.workspace.onLayoutReady(() => {
                 new Notice(`Error rendering tag #${this.mapping.tag}: ${error.message}`);
             });
-            this.container!.innerHTML = `[Error: #${this.mapping.tag}]`;
+            // Update container with error message
+            this.container.innerHTML = '';
+            this.container.appendChild(createSpan({
+                cls: 'dynamic-tag-error',
+                text: `[Error: #${this.mapping.tag}]`
+            }));
         } finally {
             console.groupEnd();
         }
     }
 }
 
-export let DynamicTagRendererPluginInstance: DynamicTagRendererPlugin | null = null;
+export let TagversePluginInstance: TagversePlugin | null = null;
 
-export default class DynamicTagRendererPlugin extends Plugin {
-    settings: DynamicTagRendererSettings;
+export default class TagversePlugin extends Plugin {
+    settings: TagverseSettings;
     private scriptCache: Map<string, Function> = new Map();
-
-
 
     async onload() {
         logger.init('Plugin loading...');
-        DynamicTagRendererPluginInstance = this;
+        TagversePluginInstance = this;
         await this.loadSettings();
 
         // Register markdown post processor for reading mode
@@ -324,16 +299,16 @@ export default class DynamicTagRendererPlugin extends Plugin {
         );
 
         // Add settings tab
-        this.addSettingTab(new DynamicTagRendererSettingTab(this.app, this));
+        this.addSettingTab(new TagverseSettingTab(this.app, this));
 
         // Add command to refresh current view
         this.addCommand({
             id: 'refresh-dynamic-tags',
-            name: 'Refresh dynamic tags in current note',
+            name: 'Refresh tagverses in current note',
             callback: () => {
-                logger.logUserAction('Command: Refresh dynamic tags');
+                logger.logUserAction('Command: Refresh tagverses');
                 this.refreshActiveView();
-                new Notice('Dynamic tags refreshed');
+                new Notice('Tagverses refreshed');
             }
         });
 
@@ -352,7 +327,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
     }
 
     onunload() {
-        DynamicTagRendererPluginInstance = null;
+        TagversePluginInstance = null;
         this.scriptCache.clear();
         // Plugin unloaded successfully
     }
@@ -404,30 +379,26 @@ export default class DynamicTagRendererPlugin extends Plugin {
         context: MarkdownPostProcessorContext
     ) {
         console.group(`📖 [DTR] Reading Mode: #${mapping.tag}`);
-        
+
         try {
-            logger.debug('READING-MODE', 'Starting render', { 
-                tag: mapping.tag, 
+            logger.debug('READING-MODE', 'Starting render', {
+                tag: mapping.tag,
                 script: mapping.scriptPath,
-                sourcePath: context.sourcePath 
+                sourcePath: context.sourcePath
             });
-            
+
             // Load and execute the script
             const renderFunction = await this.loadScript(mapping.scriptPath);
             logger.debug('READING-MODE', 'Script loaded', { tag: mapping.tag });
 
-            // Create a span container for consistency with Live Preview
-            const container = createSpan({ cls: 'dynamic-tag-container' });
-            logger.debug('READING-MODE', 'Container created', {
-                tag: mapping.tag,
-                className: container.className
-            });
+            // Create a temporary container for the script to render into (not added to DOM)
+            const tempContainer = createSpan();
 
             // Prepare context for the script
             const scriptContext: ScriptContext = {
                 app: this.app,
                 tag: mapping.tag,
-                element: container,
+                element: tempContainer,
                 sourcePath: context.sourcePath,
                 frontmatter: context.frontmatter,
                 Notice: Notice
@@ -435,7 +406,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
 
             // Execute the render function
             const result = await renderFunction(scriptContext);
-            
+
             // Log script return value with full HTML
             if (result instanceof HTMLElement) {
                 const resultStyle = window.getComputedStyle(result);
@@ -449,65 +420,43 @@ export default class DynamicTagRendererPlugin extends Plugin {
                 console.log('📦 Script return innerHTML:', result.innerHTML);
                 console.log('📦 Script return outerHTML:', result.outerHTML);
             } else {
-                logger.debug('READING-SCRIPT', 'Return value', { 
-                    tag: mapping.tag, 
+                logger.debug('READING-SCRIPT', 'Return value', {
+                    tag: mapping.tag,
                     type: typeof result,
                     isNull: result === null || result === undefined
                 });
             }
 
-            // Clear any content added by the script
-            container.innerHTML = '';
+            // Output validation and fallback - invisible wrapper
+            const wrapper = createSpan(); // Completely transparent inline wrapper
 
-            // Output validation and fallback
             if (result === null || result === undefined) {
                 // Show original tag if script returns nothing
-                container.appendChild(tagEl.cloneNode(true));
+                wrapper.appendChild(tagEl.cloneNode(true));
                 logger.debug('READING-MODE', 'Output: null/undefined - showing original tag', { tag: mapping.tag });
             } else if (typeof result === 'string') {
-                container.innerHTML = result;
-                logger.debug('READING-MODE', 'Output: string HTML', { tag: mapping.tag, length: result.length });
+                // For string results, create a span and set innerHTML
+                const stringEl = createSpan();
+                stringEl.innerHTML = result;
+                wrapper.appendChild(stringEl);
+                logger.debug('READING-MODE', 'Output: string HTML - wrapped', { tag: mapping.tag, length: result.length });
                 console.log('📝 String content:', result);
             } else if (result instanceof HTMLElement) {
-                container.appendChild(result);
-                
-                // Log after appending
-                const resultStyle = window.getComputedStyle(result);
-                logger.debug('READING-SCRIPT', 'After append to container', {
-                    tag: mapping.tag,
-                    display: resultStyle.display,
-                    position: resultStyle.position,
-                    parentDisplay: window.getComputedStyle(container).display
-                });
-                
-                logger.debug('READING-MODE', 'Output: HTMLElement appended', { tag: mapping.tag, element: result.tagName });
+                // Wrap script output in transparent container for editor compatibility
+                wrapper.appendChild(result);
+                logger.debug('READING-MODE', 'Output: HTMLElement - wrapped', { tag: mapping.tag, element: result.tagName });
             } else {
                 // Show error if output type is invalid
                 const errorEl = createSpan({
                     cls: 'dynamic-tag-error',
                     text: `[Invalid output for #${mapping.tag}]`
                 });
-                container.appendChild(errorEl);
+                wrapper.appendChild(errorEl);
                 logger.warn('READING-MODE', 'Invalid output type', { tag: mapping.tag, type: typeof result });
             }
 
-            // Ensure the container displays inline and doesn't break the line
-            container.style.verticalAlign = 'baseline';
-            container.style.margin = '0 2px';
-            
-            // Log final container state with full HTML
-            const finalContainerStyle = window.getComputedStyle(container);
-            logger.debug('READING-FINAL', 'After styles set', {
-                tag: mapping.tag,
-                containerDisplay: finalContainerStyle.display,
-                containerPosition: finalContainerStyle.position,
-                width: finalContainerStyle.width,
-                height: finalContainerStyle.height
-            });
-            console.log('✅ Final container innerHTML:', container.innerHTML);
-            console.log('✅ Final container outerHTML:', container.outerHTML);
+            tagEl.replaceWith(wrapper);
 
-            tagEl.replaceWith(container);
             logger.debug('READING-MODE', 'Render complete', { tag: mapping.tag });
 
         } catch (error) {
@@ -610,14 +559,13 @@ export default class DynamicTagRendererPlugin extends Plugin {
                     m => m.enabled && m.tag.toLowerCase() === tag.toLowerCase()
                 );
 
-                // When cursor is inside or selection contains tag (in live preview), show natively
-                if (isLivePreview && (cursorInside || selectionContains)) {
-                    const reason = cursorInside ? 'cursor inside' : 'selection contains';
-                    logger.logTagDecision(tag, 'NULL', reason + ' (show natively)', { pos, cursor });
+                // When cursor is inside tag (in live preview), show natively for editing
+                if (isLivePreview && cursorInside) {
+                    logger.logTagDecision(tag, 'NULL', 'cursor inside (show natively)', { pos, cursor });
                     return null; // Let Obsidian handle natively - no decoration
                 }
 
-                // In live preview with cursor outside: show widgets for mapped tags
+                // In live preview, always show widgets for mapped tags when cursor is outside
                 if (mapping) {
                     logger.logTagDecision(tag, 'REPLACE', 'widget', { pos, script: mapping.scriptPath });
                     
@@ -630,7 +578,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
                     }
 
                     return Decoration.replace({
-                        widget: new DynamicTagWidget(this, tag, mapping, file?.path || '', frontmatter),
+                        widget: new TagverseWidget(this, tag, mapping, file?.path || '', frontmatter),
                     });
                 }
 
@@ -687,18 +635,18 @@ export default class DynamicTagRendererPlugin extends Plugin {
 
             logDecorationState(view: EditorView, context: string) {
                 // Log decoration set size
-                logger.debug('DECO-STATE', context, { 
+                logger.debug('DECO-STATE', context, {
                     size: this.decorations.size,
                     isEmpty: this.decorations.size === 0
                 });
-                
-                // Log DOM state - check for widget containers
-                const containers = view.dom.querySelectorAll('.dynamic-tag-container');
-                logger.debug('DOM-STATE', context, { 
-                    widgetContainersFound: containers.length,
+
+                // Log DOM state - check for script elements (no longer using containers)
+                const scriptElements = view.dom.querySelectorAll('[class*="stress-"], [class*="dynamic-tag-error"]');
+                logger.debug('DOM-STATE', context, {
+                    scriptElementsFound: scriptElements.length,
                     editorClasses: view.dom.className
                 });
-                
+
                 // Log parent element classes to understand context
                 const editorParent = view.dom.closest('.cm-editor');
                 if (editorParent) {
@@ -708,7 +656,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
                         isLivePreview: editorParent.classList.contains('mod-live-preview')
                     });
                 }
-                
+
                 // Iterate through decorations to see what's actually in the set
                 let decoCount = 0;
                 const decoTypes: string[] = [];
@@ -722,9 +670,9 @@ export default class DynamicTagRendererPlugin extends Plugin {
                         decoTypes.push('other');
                     }
                 });
-                logger.debug('DECO-DETAILS', context, { 
+                logger.debug('DECO-DETAILS', context, {
                     iteratedCount: decoCount,
-                    types: decoTypes 
+                    types: decoTypes
                 });
             }
 
@@ -745,9 +693,9 @@ export default class DynamicTagRendererPlugin extends Plugin {
         console.group(`🔍 [DTR] DOM Inspection - ${mode.toUpperCase()} mode`);
 
         try {
-            // Find all widget containers in the document
-            const containers = document.querySelectorAll('.dynamic-tag-container');
-            logger.info('DOM-INSPECT', 'Containers found', { mode, count: containers.length });
+            // Find all script-generated elements (no longer using wrapper containers)
+            const scriptElements = document.querySelectorAll('[class*="stress-"], [class*="dynamic-tag-error"]');
+            logger.info('DOM-INSPECT', 'Script elements found', { mode, count: scriptElements.length });
 
             // Log theme and CSS information
             console.log('🎨 Active theme:', this.getActiveTheme());
@@ -758,15 +706,17 @@ export default class DynamicTagRendererPlugin extends Plugin {
                 rules: sheet.cssRules?.length || 0
             })));
 
-            containers.forEach((container, index) => {
-                const htmlElement = container as HTMLElement;
+            scriptElements.forEach((element, index) => {
+                const htmlElement = element as HTMLElement;
                 const computedStyle = window.getComputedStyle(htmlElement);
 
                 // Get the tag name from the content
                 const contentPreview = htmlElement.textContent?.substring(0, 50) || '';
 
-                logger.debug('DOM-INSPECT', `Container[${index}]`, {
+                logger.debug('DOM-INSPECT', `Element[${index}]`, {
                     mode,
+                    tagName: htmlElement.tagName,
+                    className: htmlElement.className,
                     display: computedStyle.display,
                     position: computedStyle.position,
                     width: computedStyle.width,
@@ -783,8 +733,8 @@ export default class DynamicTagRendererPlugin extends Plugin {
                     contentPreview
                 });
 
-                console.log(`📦 Container[${index}] innerHTML:`, htmlElement.innerHTML);
-                console.log(`📦 Container[${index}] outerHTML:`, htmlElement.outerHTML);
+                console.log(`📦 Element[${index}] innerHTML:`, htmlElement.innerHTML);
+                console.log(`📦 Element[${index}] outerHTML:`, htmlElement.outerHTML);
 
                 // Log computed styles for all elements in the hierarchy
                 this.logElementStyles(htmlElement, index, mode);
@@ -796,7 +746,7 @@ export default class DynamicTagRendererPlugin extends Plugin {
                 while (parent && level <= 5) { // Increased depth
                     const parentStyle = window.getComputedStyle(parent);
                     parentChain.push(`${parent.tagName}.${parent.className || '(no class)'}`);
-                    logger.debug('DOM-INSPECT', `Container[${index}] Parent[${level}]`, {
+                    logger.debug('DOM-INSPECT', `Element[${index}] Parent[${level}]`, {
                         tag: parent.tagName,
                         className: parent.className,
                         display: parentStyle.display,
@@ -811,11 +761,11 @@ export default class DynamicTagRendererPlugin extends Plugin {
                     parent = parent.parentElement;
                     level++;
                 }
-                console.log(`🔗 Container[${index}] Parent chain:`, parentChain.join(' → '));
+                console.log(`🔗 Element[${index}] Parent chain:`, parentChain.join(' → '));
             });
 
-            if (containers.length === 0) {
-                logger.warn('DOM-INSPECT', 'No containers found', { mode });
+            if (scriptElements.length === 0) {
+                logger.warn('DOM-INSPECT', 'No script elements found', { mode });
             }
 
         } catch (error) {
@@ -890,10 +840,10 @@ export default class DynamicTagRendererPlugin extends Plugin {
     }
 }
 
-class DynamicTagRendererSettingTab extends PluginSettingTab {
-    plugin: DynamicTagRendererPlugin;
+class TagverseSettingTab extends PluginSettingTab {
+    plugin: TagversePlugin;
 
-    constructor(app: App, plugin: DynamicTagRendererPlugin) {
+    constructor(app: App, plugin: TagversePlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -902,12 +852,12 @@ class DynamicTagRendererSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Dynamic Tag Renderer Settings' });
+        containerEl.createEl('h2', { text: 'Tagverse Settings' });
 
         // General settings
         new Setting(containerEl)
             .setName('Refresh on file change')
-            .setDesc('Automatically refresh dynamic tags when opening a file')
+            .setDesc('Automatically refresh tagverses when opening a file')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.refreshOnFileChange)
                 .onChange(async (value) => {

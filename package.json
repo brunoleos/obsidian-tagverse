@@ -1,7 +1,7 @@
 {
-    "name": "obsidian-dynamic-tag-renderer",
+    "name": "obsidian-tagverse",
     "version": "1.0.0",
-    "description": "Dynamically render tags with custom JavaScript scripts",
+    "description": "Transform tags into interactive universes of JavaScript-powered content",
     "main": "main.js",
     "scripts": {
         "dev": "node esbuild.config.mjs",
@@ -12,7 +12,10 @@
         "obsidian",
         "obsidian-plugin",
         "tags",
-        "dynamic",
+        "tagverse",
+        "universes",
+        "interactive",
+        "javascript",
         "renderer"
     ],
     "author": "brunoleos",

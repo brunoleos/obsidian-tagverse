@@ -1,11 +1,19 @@
-/* Dynamic Tag Renderer - Minimal styles for inline widget display */
+/* Dynamic Tag Renderer - Error styling only */
 
-.dynamic-tag-container {
-    display: inline-block;
-    vertical-align: baseline;
+.dynamic-tag-error {
+    color: var(--text-error);
+    background: var(--background-modifier-error);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    border: 1px solid var(--text-error);
 }
 
-/* CodeMirror-specific overrides for live preview - MAXIMUM FLEXIBILITY */
-.cm-line .dynamic-tag-container * {
-    white-space: nowrap !important;
+/* Reset CodeMirror contenteditable styles to match reading view behavior */
+.dtr-widget-container {
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    tab-size: var(--indent-size) !important;
+    text-indent: initial !important;
 }

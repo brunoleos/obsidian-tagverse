@@ -41,47 +41,89 @@ Imagine turning `#todo-button` into an actual clickable button that adds tasks t
 
 ## Usage
 
-### 1. Create a Render Script
+### Your First Dynamic Tag
 
-Create a JavaScript file anywhere in your vault (e.g., `scripts/myTagRenderer.js`):
+Get started with Tagverse in just a few minutes!
+
+#### Step 1: Create a Render Script
+
+Create a file in your vault: `scripts/my-first-renderer.js`
 
 ```javascript
-// Example: Render a tag as a button that shows a notice
 function render(context) {
+    // Create a simple button
     const button = context.element.createEl('button', {
         text: `Click me! (Tag: ${context.tag})`,
         cls: 'my-custom-button'
     });
     
     button.addEventListener('click', () => {
-        new context.app.Notice(`You clicked the ${context.tag} tag!`);
+        new context.Notice(`Hello from #${context.tag}! 👋`);
     });
-    
+
     return button;
 }
 ```
 
-### 2. Configure the Plugin
+#### Step 2: Configure the Plugin
 
-1. Open Settings → Tagverse
-2. Click "Add mapping"
-3. Enter the tag name (without #) and the path to your script
-4. The tag will now be rendered dynamically in reading/preview mode
+1. Open **Settings** → **Tagverse**
+2. Click **Add mapping**
+3. Fill in:
+   - **Tag name**: `test` (without #)
+   - **Script path**: `scripts/my-first-renderer.js`
+4. Leave **enabled** checked
+
+#### Step 3: Test It!
+
+1. Create a new note
+2. Add the tag: `#test`
+3. Switch to **Reading view** (Ctrl/Cmd + E)
+4. See your tag transformed into a button!
+5. Click it to see a notification
+
+🎉 **Congratulations!** You've created your first dynamic tag!
 
 ### Script Context
 
 Your render function receives a `context` object with:
 
-- `context.app`: The Obsidian App instance
+- `context.app`: The Obsidian App instance (full Obsidian API access)
 - `context.tag`: The tag name (without #)
 - `context.element`: The container element for your rendered content
 - `context.sourcePath`: The path of the current note
 - `context.frontmatter`: The note's frontmatter data
 - `context.Notice`: The Obsidian Notice constructor
 
+#### Useful App Methods
+
+```javascript
+// Get all markdown files
+context.app.vault.getMarkdownFiles()
+
+// Read a file
+await context.app.vault.read(file)
+
+// Get file metadata
+context.app.metadataCache.getFileCache(file)
+
+// Open a note
+context.app.workspace.openLinkText(path, '', false)
+
+// Show notification
+new context.Notice('Hello!')
+
+// Open search
+context.app.internalPlugins.getPluginById('global-search')
+    .instance.openGlobalSearch('query')
+```
+
 ### Example Scripts
 
-#### Display Tag Count
+#### Tag Counter
+
+Show how many notes use a tag:
+
 ```javascript
 function render(context) {
     const files = context.app.vault.getMarkdownFiles();
@@ -98,7 +140,12 @@ function render(context) {
 }
 ```
 
-#### Link to Tag Search
+**Tag to use**: `#project`, `#meeting`, or any tag you want
+
+#### Quick Search Link
+
+Open search for a tag with one click:
+
 ```javascript
 function render(context) {
     const searchLink = context.element.createEl('a', {
@@ -111,12 +158,17 @@ function render(context) {
         context.app.internalPlugins.getPluginById('global-search')
             .instance.openGlobalSearch(`tag:#${context.tag}`);
     });
-    
+
     return searchLink;
 }
 ```
 
-#### Display Related Notes
+**Tag to use**: `#important`, `#todo`, `#idea`
+
+#### Related Notes List
+
+Show notes that share the tag:
+
 ```javascript
 async function render(context) {
     const files = context.app.vault.getMarkdownFiles();
@@ -148,6 +200,57 @@ async function render(context) {
     return container;
 }
 ```
+
+**Tag to use**: `#topic`, `#reference`, `#resource`
+
+## Tips & Tricks
+
+### Multiple Tags, One Script
+
+You can map multiple tags to the same script! Just add multiple mappings in settings:
+- `#project` → `scripts/task-progress.js`
+- `#work` → `scripts/task-progress.js`
+- `#personal` → `scripts/task-progress.js`
+
+### Conditional Rendering
+
+Return `null` to skip rendering:
+
+```javascript
+function render(context) {
+    // Only render in specific notes
+    if (!context.sourcePath.includes('Projects')) {
+        return null;
+    }
+
+    // Your rendering logic...
+}
+```
+
+### Use Note Frontmatter
+
+Access frontmatter in your scripts:
+
+```javascript
+function render(context) {
+    const status = context.frontmatter?.status || 'unknown';
+    return `<span>#${context.tag} • Status: ${status}</span>`;
+}
+```
+
+### Debugging
+
+Check the console for errors:
+1. Press `Ctrl/Cmd + Shift + I` to open Developer Tools
+2. Go to the **Console** tab
+3. Look for error messages
+
+### Refresh Rendered Tags
+
+If tags don't update:
+1. Open Command Palette (`Ctrl/Cmd + P`)
+2. Run: "Refresh tagverses in current note"
+3. Or: "Clear script cache"
 
 ## 🔥 Showcases of Tagverse Power
 
@@ -192,6 +295,41 @@ Turn #habit-tracker into an interactive progress tracker
 
 - **Refresh tagverses in current note**: Manually refresh all rendered tags
 - **Clear script cache**: Clear the script cache (useful when developing scripts)
+
+## Troubleshooting
+
+### Tag Not Rendering
+- ✅ Are you in **Reading/Preview mode**? (not Source mode)
+- ✅ Is the mapping **enabled** in settings?
+- ✅ Does the tag name match exactly? (case-sensitive, no #)
+- ✅ Does the script file exist at the specified path?
+
+### Script Error
+- ✅ Check console for error details (`Ctrl/Cmd + Shift + I`)
+- ✅ Is `render()` function defined?
+- ✅ Are there any syntax errors in your JavaScript?
+
+### Tags Showing Old Content
+- Run "Clear script cache" command
+- Restart Obsidian
+
+## Next Steps
+
+Ready to unleash the full power of Tagverse? Here's what's next:
+
+1. **Explore Examples**: Dive into the `examples/` folder for inspiration and copy-paste scripts
+2. **Read Full Docs**: Visit [DOCUMENTATION.md](DOCUMENTATION.md) for advanced features and API details
+3. **Join Community**: Share your creations and get help on the [Obsidian Discord](https://discord.gg/obsidianmd)
+4. **Create Cool Scripts**: Experiment with your own tag transformations and have fun!
+
+### Need Help?
+
+- 📖 **[Full Documentation](DOCUMENTATION.md)**: Advanced guides and API reference
+- 🐛 **[Report Issues](https://github.com/brunoleos/obsidian-tagverse/issues)**: Found a bug? Let us know
+- 💬 **[Obsidian Discord](https://discord.gg/obsidianmd)**: Community support and discussions
+- 💡 **[Feature Requests](https://github.com/brunoleos/obsidian-tagverse/issues/new)**: Have an idea? Suggest it here
+
+---
 
 ## Development
 

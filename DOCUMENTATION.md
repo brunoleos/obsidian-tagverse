@@ -40,7 +40,8 @@ The context provides everything you need:
     tag: string,           // Tag name without #
     element: HTMLElement,  // Pre-created container
     sourcePath: string,    // Current note path
-    frontmatter: object    // Note's frontmatter
+    frontmatter: object,   // Note's frontmatter
+    Notice: Notice         // Obsidian Notice constructor
 }
 ```
 
@@ -75,7 +76,7 @@ function render(context) {
     const button = context.element.createEl('button');
     button.textContent = `Click #${context.tag}!`;
     button.addEventListener('click', () => {
-        new context.app.Notice(`Hello from #${context.tag}!`);
+        new context.Notice(`Hello from #${context.tag}!`);
     });
     return button;
 }
@@ -136,7 +137,7 @@ context.app.plugins.getPlugin(pluginId)
 context.app.internalPlugins.getPluginById(pluginId)
 
 // UI
-new context.app.Notice(message)
+new context.Notice(message)
 ```
 
 ### Helper Functions

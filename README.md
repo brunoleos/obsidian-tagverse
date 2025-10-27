@@ -77,6 +77,7 @@ Your render function receives a `context` object with:
 - `context.element`: The container element for your rendered content
 - `context.sourcePath`: The path of the current note
 - `context.frontmatter`: The note's frontmatter data
+- `context.Notice`: The Obsidian Notice constructor
 
 ### Example Scripts
 

@@ -2,16 +2,9 @@ import { App, TFile } from 'obsidian';
 import { logger } from '../utils/logger';
 import { IScriptLoader } from './interfaces';
 
-/**
- * Service responsible for loading and caching script files.
- * Implements Single Responsibility Principle by focusing only on script management.
- */
 export class ScriptLoaderService implements IScriptLoader {
     private scriptCache: Map<string, Function> = new Map();
 
-    /**
-     * Load a script from file or cache
-     */
     async loadScript(scriptPath: string, app: App): Promise<Function> {
         // Check cache first
         if (this.scriptCache.has(scriptPath)) {

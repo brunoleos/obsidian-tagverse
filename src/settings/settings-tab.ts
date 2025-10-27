@@ -54,10 +54,11 @@ export class TagverseSettingTab extends PluginSettingTab {
             <p><strong>Script format:</strong> Each script should define a <code>render(context)</code> function that receives:</p>
             <ul>
                 <li><code>context.app</code> - The Obsidian App instance</li>
-                <li><code>context.tag</code> - The tag name</li>
-                <li><code>context.element</code> - The container element</li>
-                <li><code>context.sourcePath</code> - Path of the note</li>
-                <li><code>context.frontmatter</code> - Note frontmatter</li>
+                <li><code>context.tag</code> - The tag name (without #)</li>
+                <li><code>context.element</code> - The container element for your rendered content</li>
+                <li><code>context.sourcePath</code> - The path of the current note</li>
+                <li><code>context.frontmatter</code> - The note's frontmatter data</li>
+                <li><code>context.Notice</code> - The Obsidian Notice constructor</li>
             </ul>
         `;
 

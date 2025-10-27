@@ -7,11 +7,6 @@ declare global {
     function createSpan(attrs?: any): HTMLSpanElement;
 }
 
-/**
- * Abstract base class for tag rendering in different modes.
- * Provides common functionality for script execution and result processing.
- * Implements Dependency Inversion Principle by depending on abstractions (IScriptLoader).
- */
 export abstract class TagRenderer {
     protected container: HTMLElement | null = null;
     protected rendered = false;
@@ -41,16 +36,10 @@ export abstract class TagRenderer {
      */
     abstract render(frontmatter: any): Promise<void>;
 
-    /**
-     * Load a script from file or cache using the injected service
-     */
     protected async loadScript(scriptPath: string): Promise<Function> {
         return this.scriptLoader.loadScript(scriptPath, this.app);
     }
 
-    /**
-     * Create script execution context
-     */
     protected createScriptContext(frontmatter: any): ScriptContext {
         return {
             app: this.app,
@@ -62,9 +51,6 @@ export abstract class TagRenderer {
         };
     }
 
-    /**
-     * Log script execution result
-     */
     protected logScriptResult(result: any) {
         if (result instanceof HTMLElement) {
             logger.logScriptExecution('Script returned HTMLElement', {

@@ -17,9 +17,7 @@ import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../service
 export let TagversePluginInstance: TagversePlugin | null = null;
 
 /**
- * Main plugin class - orchestrates services and Obsidian integrations.
- * Implements Single Responsibility Principle by delegating to services.
- * Implements Dependency Inversion Principle by depending on service interfaces.
+ * Main plugin class for Tagverse
  */
 export default class TagversePlugin extends Plugin {
     // Service instances (dependency injection)

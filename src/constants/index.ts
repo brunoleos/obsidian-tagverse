@@ -15,7 +15,6 @@ export const LOG_LEVELS = {
 // CSS classes
 export const CSS_CLASSES = {
     WIDGET_CONTAINER: 'tagverse-widget-container',
-    INLINE_WRAPPER: 'tagverse-inline-wrapper',
     ERROR: 'tagverse-error'
 } as const;
 

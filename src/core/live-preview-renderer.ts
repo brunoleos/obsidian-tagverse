@@ -73,10 +73,10 @@ export class LivePreviewRenderer extends TagRenderer {
         try {
             // Execute script and get result
             const result = await this.executeScript(frontmatter);
-            
+
             // Process the result into an HTMLElement
             const contentElement = this.processScriptResult(result);
-            
+
             // Update container with rendered content
             this.container!.innerHTML = '';
             this.container!.appendChild(contentElement);
@@ -112,18 +112,12 @@ export class LivePreviewRenderer extends TagRenderer {
         }
 
         if (result instanceof HTMLElement) {
-            // Use inline-block wrapper for live preview
-            const wrapper = createSpan({ cls: 'tagverse-inline-wrapper' });
-            wrapper.style.display = 'inline-block';
-            wrapper.style.verticalAlign = 'top';
-            wrapper.style.maxWidth = '100%';
-            wrapper.style.overflow = 'visible';
-            wrapper.appendChild(result);
-            logger.logRenderPipeline('Output wrapped in inline container', {
+            // Return directly, styling handled in render method on container
+            logger.logRenderPipeline('Output rendered directly as HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName
             });
-            return wrapper;
+            return result;
         }
 
         // Invalid output type

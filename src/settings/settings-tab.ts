@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, TFile } from 'obsidian';
 import TagversePlugin from '../core/plugin';
 import { TagverseSettings, TagScriptMapping } from '../types/interfaces';
 
@@ -81,49 +81,77 @@ export class TagverseSettingTab extends PluginSettingTab {
                 })
             );
 
+        // Get all JavaScript files in the vault for the dropdown
+        const jsFiles = this.app.vault.getAllLoadedFiles()
+            .filter(file => file instanceof TFile && file.extension === 'js')
+            .map(file => file.path)
+            .sort();
+
         // Display existing mappings
         this.plugin.settings.tagMappings.forEach((mapping: TagScriptMapping, index: number) => {
-            const setting = new Setting(containerEl)
-                .setClass('dynamic-tag-mapping')
-                .addText(text => text
-                    .setPlaceholder('Tag name (without #)')
-                    .setValue(mapping.tag)
-                    .onChange(async (value) => {
-                        const settings = this.plugin.settings;
-                        mapping.tag = value;
-                        await this.plugin.saveSettings(settings);
-                    })
-                )
-                .addText(text => text
-                    .setPlaceholder('Script path (e.g., scripts/myRenderer.js)')
-                    .setValue(mapping.scriptPath)
-                    .onChange(async (value) => {
-                        const settings = this.plugin.settings;
-                        mapping.scriptPath = value;
-                        await this.plugin.saveSettings(settings);
-                    })
-                )
-                .addToggle(toggle => toggle
-                    .setTooltip('Enable/disable this mapping')
-                    .setValue(mapping.enabled)
-                    .onChange(async (value) => {
-                        const settings = this.plugin.settings;
-                        mapping.enabled = value;
-                        await this.plugin.saveSettings(settings);
-                    })
-                )
-                .addButton(button => button
-                    .setButtonText('Delete')
-                    .setWarning()
-                    .onClick(async () => {
-                        const settings = this.plugin.settings;
-                        settings.tagMappings.splice(index, 1);
-                        await this.plugin.saveSettings(settings);
-                        this.display();
-                    })
-                );
+            const mappingRow = containerEl.createDiv({ cls: 'tagverse-mapping-row' });
+            const controlsContainer = mappingRow.createDiv({ cls: 'tagverse-mapping-controls' });
 
-            setting.infoEl.remove(); // Remove the default name/desc area
+            // Tag input - flexible width
+            const tagInputContainer = controlsContainer.createDiv({ cls: 'setting-item-control' });
+            const tagInput = tagInputContainer.createEl('input', {
+                type: 'text',
+                placeholder: 'Tag name (without #)',
+                value: mapping.tag,
+                cls: 'tag-input',
+            });
+            tagInput.addEventListener('input', async (e) => {
+                const settings = this.plugin.settings;
+                mapping.tag = (e.target as HTMLInputElement).value;
+                await this.plugin.saveSettings(settings);
+            });
+
+            // Script dropdown - flexible width
+            const scriptDropdownContainer = controlsContainer.createDiv({ cls: 'setting-item-control' });
+            const scriptSelect = scriptDropdownContainer.createEl('select', { cls: 'script-dropdown' });
+            scriptSelect.createEl('option', { text: 'Select script file...', value: '' });
+            jsFiles.forEach(path => {
+                scriptSelect.createEl('option', { text: path, value: path });
+            });
+            scriptSelect.value = mapping.scriptPath;
+            scriptSelect.addEventListener('change', async (e) => {
+                const settings = this.plugin.settings;
+                mapping.scriptPath = (e.target as HTMLSelectElement).value;
+                await this.plugin.saveSettings(settings);
+            });
+
+            // Enable toggle - using Obsidian's native checkbox styling
+            const toggleContainer = controlsContainer.createDiv({ cls: 'setting-item-control tagverse-setting-fixed-width' });
+            const checkboxWrapper = toggleContainer.createDiv({
+                cls: 'checkbox-container' + (mapping.enabled ? ' is-enabled' : '')
+            });
+
+            // Make the entire container clickable like Obsidian does
+            checkboxWrapper.addEventListener('click', async (e) => {
+                e.preventDefault();
+                mapping.enabled = !mapping.enabled;
+                checkboxWrapper.className = 'checkbox-container' + (mapping.enabled ? ' is-enabled' : '');
+                const settings = this.plugin.settings;
+                await this.plugin.saveSettings(settings);
+            });
+
+            // Delete button - fixed width, using trash icon style like other settings
+            const buttonContainer = controlsContainer.createDiv({ cls: 'setting-item-control tagverse-setting-fixed-width' });
+            const deleteButton = buttonContainer.createEl('div', {
+                cls: 'clickable-icon extra-setting-button',
+                attr: { 'aria-label': 'Delete mapping' },
+            });
+
+            // Create the trash SVG icon using innerHTML since createEl doesn't support SVG
+            deleteButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+
+            // Add click event
+            deleteButton.addEventListener('click', async () => {
+                const settings = this.plugin.settings;
+                settings.tagMappings.splice(index, 1);
+                await this.plugin.saveSettings(settings);
+                this.display();
+            });
         });
     }
 }

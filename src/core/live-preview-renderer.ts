@@ -1,14 +1,14 @@
-import { 
-    Decoration, 
-    DecorationSet, 
-    EditorView, 
-    ViewPlugin, 
-    ViewUpdate, 
+import {
+    Decoration,
+    DecorationSet,
+    EditorView,
+    ViewPlugin,
+    ViewUpdate,
     MatchDecorator,
     WidgetType
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
-import { StateField } from '@codemirror/state';
+import { StateField, StateEffect } from '@codemirror/state';
 import { logger } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
@@ -18,6 +18,26 @@ import { RendererFactoryService } from '../services/renderer-factory.service';
 declare global {
     function createSpan(attrs?: any): HTMLSpanElement;
 }
+
+/**
+ * State effect to trigger tag mapping updates
+ */
+const tagMappingUpdateEffect = StateEffect.define<number>();
+
+/**
+ * State field to track tag mapping changes for triggering live preview updates
+ */
+const tagMappingVersionField = StateField.define<number>({
+    create: () => 0,
+    update: (value, tr) => {
+        for (let effect of tr.effects) {
+            if (effect.is(tagMappingUpdateEffect)) {
+                return effect.value;
+            }
+        }
+        return value;
+    },
+});
 
 /**
  * Renderer for live preview mode.
@@ -192,19 +212,26 @@ export class LivePreviewRenderer extends TagRenderer {
 
                 const docChanged = update.docChanged;
                 const selectionChanged = update.startState.selection.main !== update.state.selection.main;
+                const mappingVersionChanged = update.startState.field(tagMappingVersionField) !==
+                                              update.state.field(tagMappingVersionField);
 
                 logger.debug('VIEWPLUGIN', 'Update called', {
                     docChanged,
                     selectionChanged,
                     editorModeChanged,
+                    mappingVersionChanged,
                     cursor: update.state.selection.main.head
                 });
 
-                // Update decorations if document changed, selection changed, or editor mode changed
-                if (docChanged || selectionChanged || editorModeChanged) {
-                    logger.debug('VIEWPLUGIN', 'Rebuilding decorations', {
-                        reason: docChanged ? 'doc changed' : selectionChanged ? 'selection changed' : 'mode changed'
-                    });
+                // Check if any relevant change occurred
+                const needsRebuild = docChanged || selectionChanged || editorModeChanged || mappingVersionChanged;
+
+                if (needsRebuild) {
+                    const reason = mappingVersionChanged ? 'mapping changed' :
+                                  selectionChanged ? 'selection changed' :
+                                  editorModeChanged ? 'mode changed' : 'doc changed';
+
+                    logger.debug('VIEWPLUGIN', 'Rebuilding decorations', { reason });
 
                     const isLivePreview = isEditorInLivePreviewMode(update.view);
                     // Only create decorations in live preview mode
@@ -219,7 +246,16 @@ export class LivePreviewRenderer extends TagRenderer {
             decorations: v => v.decorations
         });
 
-        return livePreviewPlugin;
+        // Return both the plugin and state field
+        return [livePreviewPlugin, tagMappingVersionField];
+    }
+
+    /**
+     * Create an effect that triggers live preview decoration rebuild
+     * This should be called when tag mappings change to force re-rendering
+     */
+    static createInvalidateEffect(): StateEffect<number> {
+        return tagMappingUpdateEffect.of(Date.now()); // Use timestamp as version
     }
 }
 
@@ -239,8 +275,22 @@ class TagverseWidgetType extends WidgetType {
     }
 
     eq(other: TagverseWidgetType): boolean {
-        return other.renderer['tag'] === this.renderer['tag'] && 
-               other.renderer['sourcePath'] === this.renderer['sourcePath'];
+        const tagEq = other.renderer['tag'] === this.renderer['tag'];
+        const sourceEq = other.renderer['sourcePath'] === this.renderer['sourcePath'];
+        const scriptEq = other.renderer['mapping'].scriptPath === this.renderer['mapping'].scriptPath;
+        const result = tagEq && sourceEq && scriptEq;
+
+        logger.logWidgetLifecycle('Widget eq check', {
+            tag: this.renderer['tag'],
+            tagEq,
+            sourceEq,
+            scriptEq,
+            result,
+            script: this.renderer['mapping'].scriptPath,
+            otherScript: other.renderer['mapping'].scriptPath
+        });
+
+        return result;
     }
 
     toDOM(): HTMLElement {

@@ -17,3 +17,33 @@
     tab-size: var(--indent-size) !important;
     text-indent: initial !important;
 }
+
+/* Tag-Script Mapping Row */
+.tagverse-mapping-row {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.tagverse-mapping-controls {
+    display: grid;
+    grid-template-columns: 144px 1fr auto auto;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.tagverse-mapping-controls .setting-item-control {
+    text-align: left;
+}
+
+.tagverse-mapping-controls input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tagverse-mapping-controls select {
+    width: 100%;
+    box-sizing: border-box;
+}

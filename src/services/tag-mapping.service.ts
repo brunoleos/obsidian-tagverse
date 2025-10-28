@@ -21,16 +21,16 @@ export class TagMappingService implements ITagMappingProvider {
      */
     rebuildMappings(mappings: TagScriptMapping[]): void {
         this.normalizedTagMap.clear();
-        
+
         mappings.forEach((mapping) => {
             if (mapping.enabled) {
-                this.normalizedTagMap.set(mapping.tag.toLowerCase(), mapping);
+                this.normalizedTagMap.set(mapping.tag.toLowerCase(), { ...mapping });
             }
         });
 
-        logger.logPluginInit('Tag mappings rebuilt', { 
+        logger.logPluginInit('Tag mappings rebuilt', {
             totalMappings: mappings.length,
-            enabledMappings: this.normalizedTagMap.size 
+            enabledMappings: this.normalizedTagMap.size
         });
     }
 

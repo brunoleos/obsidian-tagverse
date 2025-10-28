@@ -26,6 +26,9 @@ export default class TagversePlugin extends Plugin {
     private settingsService: ISettingsService;
     private rendererFactory: RendererFactoryService;
 
+    // Track the last mode of the active view to detect mode changes
+    private lastActiveViewMode: string | null = null;
+
     // Public getter for settings (backward compatibility)
     get settings(): TagverseSettings {
         return this.settingsService.getSettings();
@@ -82,6 +85,13 @@ export default class TagversePlugin extends Plugin {
                 if (this.settings.refreshOnFileChange) {
                     this.refreshActiveView();
                 }
+            })
+        );
+
+        // Register event for layout changes to detect mode switches
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                this.checkForModeChange();
             })
         );
 
@@ -156,19 +166,51 @@ export default class TagversePlugin extends Plugin {
         logger.logPluginInit('Settings changed, services updated');
     }
 
+    /**
+     * Check if the active view's mode has changed and refresh if needed
+     */
+    private checkForModeChange(): void {
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (activeView) {
+            const currentMode = activeView.getMode();
+
+            // Check if mode changed
+            if (this.lastActiveViewMode !== null && this.lastActiveViewMode !== currentMode) {
+                logger.logPluginInit(`View mode changed from ${this.lastActiveViewMode} to ${currentMode}, refreshing`);
+                this.refreshActiveView();
+            }
+
+            // Update last known mode
+            this.lastActiveViewMode = currentMode;
+        }
+    }
+
     private refreshActiveView() {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
             const currentMode = view.getMode();
             if (currentMode === 'preview') {
-                // Force re-render in preview mode
+                // Force re-render in reading mode
                 view.previewMode.rerender(true);
             } else if (currentMode === 'source') {
-                // In source mode, no decorations to refresh - it's plain text
-                // The MatchDecorator will handle live preview mode automatically
-                return;
+                // Force complete live preview decoration rebuild
+                try {
+                    // Access CodeMirror EditorView (this is implementation-specific but necessary)
+                    const cm = (view.editor as any).cm;
+                    if (cm) {
+                        // Dispatch enhanced transaction with user event to force visual update
+                        const transactionSpec = {
+                            effects: [LivePreviewRenderer.createInvalidateEffect()],
+                            userEvent: "invalidate"
+                        };
+                        cm.dispatch(transactionSpec);
+                        logger.logPluginInit('Live preview decorations invalidated with forced update');
+                    }
+                } catch (error) {
+                    // If not live preview or CodeMirror not accessible, ignore
+                    logger.logPluginInit('Could not invalidate live preview decorations', error);
+                }
             }
-            // For live preview mode, the MatchDecorator will automatically update
         }
     }
 }

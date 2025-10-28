@@ -1,6 +1,7 @@
 // Example: Interactive Tag Filter
-// Displays all notes with this tag in a filterable list
-// Allows searching through related notes dynamically
+// Displays a filterable list of notes tagged with the given tag, allowing dynamic search
+// through related notes
+
 async function render(context) {
     const container = context.element.createDiv({ cls: 'tag-filter' });
 

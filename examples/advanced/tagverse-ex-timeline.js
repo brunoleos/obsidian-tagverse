@@ -1,6 +1,6 @@
-// Example: Tag Timeline Visualization
-// Shows a chronological timeline of notes that use this tag
-// Groups notes by month with creation dates
+// Example: Tag Timeline
+// Creates a timeline visualization grouping notes by month, sorted by creation date
+
 async function render(context) {
     const container = context.element.createDiv({ cls: 'tag-timeline' });
 

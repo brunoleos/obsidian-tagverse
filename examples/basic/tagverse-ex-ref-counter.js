@@ -1,34 +1,21 @@
-// Example render script for Dynamic Tag Renderer
-// This file shows how to create a custom tag renderer
+// Example: Badge with Count
+// Creates a badge element displaying the tag name and the count of notes that contain it
 
-/**
- * The render function is called for each tag that matches your configuration
- * @param {Object} context - The rendering context
- * @param {App} context.app - Obsidian App instance
- * @param {string} context.tag - The tag name (without #)
- * @param {HTMLElement} context.element - Container element
- * @param {string} context.sourcePath - Path of the current note
- * @param {Object} context.frontmatter - Note frontmatter
- * @returns {HTMLElement|string|null} The rendered content
- */
 async function render(context) {
-    
-    // Example 3: Create a badge with count
-    
     const files = context.app.vault.getMarkdownFiles();
     let count = 0;
-    
+
     for (const file of files) {
         const cache = context.app.metadataCache.getFileCache(file);
         if (cache?.tags?.some(t => t.tag === '#' + context.tag)) {
             count++;
         }
     }
-    
+
     const badge = context.element.createEl('span', {
         cls: 'tag-badge'
     });
-    
+
     badge.innerHTML = `
         <span style="
             display: inline-flex;
@@ -51,6 +38,6 @@ async function render(context) {
             ">${count}</span>
         </span>
     `;
-    
+
     return badge;
 }

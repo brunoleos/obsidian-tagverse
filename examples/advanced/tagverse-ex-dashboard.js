@@ -1,6 +1,7 @@
 // Example: Tag Statistics Dashboard
-// Displays statistics about notes that use this tag
-// Shows total notes, word count, average words per note, and newest note
+// Displays statistics about notes using this tag, including total notes, word count, average
+// words per note, and newest note
+
 async function render(context) {
     const container = context.element.createDiv({ cls: 'tag-dashboard' });
 

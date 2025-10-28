@@ -1,6 +1,7 @@
-// Example: Tag-based Task Counter
-// Shows task completion progress for notes with this tag
-// Counts completed vs total tasks with progress bar
+// Example: Task Completion Progress
+// Calculates and displays task completion statistics for notes tagged with the given tag,
+// showing a progress bar and remaining tasks
+
 async function render(context) {
     const files = context.app.vault.getMarkdownFiles();
     let totalTasks = 0;

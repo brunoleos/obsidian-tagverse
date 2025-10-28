@@ -1,11 +1,7 @@
-// Stress test script for Dynamic Tag Renderer
-// Tests various layout scenarios to ensure identical rendering in reading and live preview modes
+// Example: Layout Stress Test
+// Creates various layout scenarios including badges, buttons, multi-element containers,
+// and nested flex elements to test rendering consistency
 
-/**
- * Comprehensive stress test for layout consistency
- * @param {Object} context - The rendering context
- * @returns {HTMLElement} The test widget
- */
 async function render(context) {
 
     // Create main container

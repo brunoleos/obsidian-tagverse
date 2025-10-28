@@ -1,20 +1,8 @@
-// Example render script for Dynamic Tag Renderer
-// This file shows how to create a custom tag renderer
+// Example: Interactive Button with Tag Count
+// Creates an interactive button with hover effects that shows the count of notes tagged
+// with the given tag and can open global search for it
 
-/**
- * The render function is called for each tag that matches your configuration
- * @param {Object} context - The rendering context
- * @param {App} context.app - Obsidian App instance
- * @param {string} context.tag - The tag name (without #)
- * @param {HTMLElement} context.element - Container element
- * @param {string} context.sourcePath - Path of the current note
- * @param {Object} context.frontmatter - Note frontmatter
- * @returns {HTMLElement|string|null} The rendered content
- */
 async function render(context) {
-    
-    // Example 2: Create an interactive button
-    
     const button = context.element.createEl('button', {
         text: `🏷️ ${context.tag}`,
         cls: 'dynamic-tag-button'

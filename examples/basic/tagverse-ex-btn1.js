@@ -1,4 +1,7 @@
-function render(context) {
+// Example: Basic Interactive Button
+// Creates and returns a clickable button element that shows a notice when clicked
+
+async function render(context) {
     // Create a simple button
     const button = context.element.createEl('button', {
         text: `🎉 You clicked #${context.tag}!`,

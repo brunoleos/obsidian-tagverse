@@ -1,43 +1,18 @@
-import {
-    Decoration,
-    DecorationSet,
-    EditorView,
-    ViewPlugin,
-    ViewUpdate,
-    MatchDecorator,
-    WidgetType
-} from '@codemirror/view';
-import { App, editorLivePreviewField } from 'obsidian';
-import { StateField, StateEffect } from '@codemirror/state';
+import { WidgetType, ViewPlugin } from '@codemirror/view';
+import { App } from 'obsidian';
+import { StateEffect, StateField } from '@codemirror/state';
 import { logger } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { TagRenderer } from './renderer';
+import { TagMappingStateManager } from './live-preview-state';
+import { TagMatchingService } from '../services/tag-matching.service';
+import { LivePreviewCodeMirrorExtension } from './live-preview-codemirror-extension';
 import { RendererFactoryService } from '../services/renderer-factory.service';
 
 declare global {
     function createSpan(attrs?: any): HTMLSpanElement;
 }
-
-/**
- * State effect to trigger tag mapping updates
- */
-const tagMappingUpdateEffect = StateEffect.define<number>();
-
-/**
- * State field to track tag mapping changes for triggering live preview updates
- */
-const tagMappingVersionField = StateField.define<number>({
-    create: () => 0,
-    update: (value, tr) => {
-        for (let effect of tr.effects) {
-            if (effect.is(tagMappingUpdateEffect)) {
-                return effect.value;
-            }
-        }
-        return value;
-    },
-});
 
 /**
  * Renderer for live preview mode.
@@ -120,134 +95,10 @@ export class LivePreviewRenderer extends TagRenderer {
         app: App,
         tagMapping: ITagMappingProvider,
         rendererFactory: RendererFactoryService
-    ) {
-        // Helper function to check if editor is in live preview mode
-        const isEditorInLivePreviewMode = (view: EditorView) =>
-            view.state.field(editorLivePreviewField as unknown as StateField<boolean>);
-
-        // Helper functions for cursor position detection
-        const isCursorInsideTag = (view: EditorView, start: number, length: number) => {
-            const cursor = view.state.selection.main.head;
-            return (cursor > start - 1 && cursor < start + length + 1);
-        };
-
-        // Create MatchDecorator for live preview hashtag replacement
-        const tagMatchDecorator = new MatchDecorator({
-            regexp: /#([a-zA-Z0-9_-]+)/g,
-            decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {
-                const tag = match[1];
-                const tagLength = match[0].length;
-                const cursor = view.state.selection.main.head;
-
-                logger.startGroup(`MATCH-${tag}`, 'Tag match processing', { tag, pos, cursor });
-                logger.debug('MATCH', 'Tag found', { tag, pos, length: tagLength, cursor });
-
-                // Check if this tag has a mapping (optimized O(1) lookup)
-                const mapping = tagMapping.getMapping(tag);
-
-                // For unmapped tags: immediately exit
-                if (!mapping) {
-                    logger.logTagMatching('Decision made', { tag, decision: 'NULL', reason: 'no mapping found', pos });
-                    logger.endGroup();
-                    return null; // Let Obsidian handle natively
-                }
-
-                // For mapped tags: check cursor/mode conditions
-                const isLivePreview = isEditorInLivePreviewMode(view);
-                logger.debug('MATCH', 'Mode check', { tag, isLivePreview });
-
-                // Check cursor position
-                const cursorInside = isCursorInsideTag(view, pos, tagLength);
-                logger.debug('MATCH', 'Cursor check', { tag, cursorInside, cursor, start: pos, end: pos + tagLength });
-
-                // When cursor is inside tag (in live preview), show natively for editing
-                if (isLivePreview && cursorInside) {
-                    logger.logTagMatching('Decision made', { tag, decision: 'NULL', reason: 'cursor inside (show natively)', pos, cursor });
-                    logger.endGroup();
-                    return null; // Let Obsidian handle natively - no decoration
-                }
-
-                // In live preview, show widgets for mapped tags when cursor is outside
-                logger.logTagMatching('Decision made', { tag, decision: 'REPLACE', reason: 'widget', pos, script: mapping.scriptPath });
-
-                // Get frontmatter from the current file
-                const file = app.workspace.getActiveFile();
-                let frontmatter = {};
-                if (file) {
-                    const cache = app.metadataCache.getFileCache(file);
-                    frontmatter = cache?.frontmatter || {};
-                }
-
-                logger.endGroup();
-                
-                // Create renderer using factory and return decoration
-                const renderer = rendererFactory.createLivePreviewRenderer(
-                    tag,
-                    mapping,
-                    file?.path || '',
-                    frontmatter
-                );
-                
-                return Decoration.replace({
-                    widget: renderer.getWidgetType(),
-                });
-            }
-        });
-
-        // Create ViewPlugin for live preview
-        const livePreviewPlugin = ViewPlugin.fromClass(class {
-            decorations: DecorationSet;
-
-            constructor(view: EditorView) {
-                logger.debug('VIEWPLUGIN', 'Constructor', { });
-                const isLivePreview = isEditorInLivePreviewMode(view);
-                // Only create decorations in live preview mode
-                this.decorations = isLivePreview ? tagMatchDecorator.createDeco(view) : Decoration.none;
-            }
-
-            update(update: ViewUpdate) {
-                // Check if editor mode changed
-                const editorModeChanged = update.startState.field(editorLivePreviewField as unknown as StateField<boolean>) !==
-                                         update.state.field(editorLivePreviewField as unknown as StateField<boolean>);
-
-                const docChanged = update.docChanged;
-                const selectionChanged = update.startState.selection.main !== update.state.selection.main;
-                const mappingVersionChanged = update.startState.field(tagMappingVersionField) !==
-                                              update.state.field(tagMappingVersionField);
-
-                logger.debug('VIEWPLUGIN', 'Update called', {
-                    docChanged,
-                    selectionChanged,
-                    editorModeChanged,
-                    mappingVersionChanged,
-                    cursor: update.state.selection.main.head
-                });
-
-                // Check if any relevant change occurred
-                const needsRebuild = docChanged || selectionChanged || editorModeChanged || mappingVersionChanged;
-
-                if (needsRebuild) {
-                    const reason = mappingVersionChanged ? 'mapping changed' :
-                                  selectionChanged ? 'selection changed' :
-                                  editorModeChanged ? 'mode changed' : 'doc changed';
-
-                    logger.debug('VIEWPLUGIN', 'Rebuilding decorations', { reason });
-
-                    const isLivePreview = isEditorInLivePreviewMode(update.view);
-                    // Only create decorations in live preview mode
-                    this.decorations = isLivePreview ? tagMatchDecorator.createDeco(update.view) : Decoration.none;
-                }
-            }
-
-            destroy() {
-                logger.debug('VIEWPLUGIN', 'Destroyed', {});
-            }
-        }, {
-            decorations: v => v.decorations
-        });
-
-        // Return both the plugin and state field
-        return [livePreviewPlugin, tagMappingVersionField];
+    ): [ViewPlugin<any>, StateField<number>] {
+        const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app);
+        const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app);
+        return extension.createExtension();
     }
 
     /**
@@ -255,7 +106,7 @@ export class LivePreviewRenderer extends TagRenderer {
      * This should be called when tag mappings change to force re-rendering
      */
     static createInvalidateEffect(): StateEffect<number> {
-        return tagMappingUpdateEffect.of(Date.now()); // Use timestamp as version
+        return TagMappingStateManager.createInvalidateEffect();
     }
 }
 

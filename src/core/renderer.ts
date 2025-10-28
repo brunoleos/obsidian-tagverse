@@ -115,66 +115,7 @@ export abstract class TagRenderer {
     /**
      * Process script result into an HTMLElement
      */
-    protected processScriptResult(result: any): HTMLElement {
-        const isLivePreview = this.getMode() === 'live-preview';
-
-        if (result === null || result === undefined) {
-            const fallback = isLivePreview
-                ? createSpan({ text: `#${this.tag}` })
-                : createSpan();
-            logger.logRenderPipeline(
-                isLivePreview ? 'Output fallback to plain tag' : 'Output fallback to original tag',
-                { tag: this.tag, reason: 'null/undefined result' }
-            );
-            return fallback;
-        }
-
-        if (typeof result === 'string') {
-            const stringEl = createSpan();
-            stringEl.innerHTML = result;
-            logger.logRenderPipeline('Output rendered as HTML string', {
-                tag: this.tag,
-                length: result.length
-            });
-            return stringEl;
-        }
-
-        if (result instanceof HTMLElement) {
-            if (isLivePreview) {
-                // Use inline-block wrapper for live preview
-                const wrapper = createSpan({ cls: 'tagverse-inline-wrapper' });
-                wrapper.style.display = 'inline-block';
-                wrapper.style.verticalAlign = 'top';
-                wrapper.style.maxWidth = '100%';
-                wrapper.style.overflow = 'visible';
-                wrapper.appendChild(result);
-                logger.logRenderPipeline('Output wrapped in inline container', {
-                    tag: this.tag,
-                    elementType: result.tagName
-                });
-                return wrapper;
-            } else {
-                // Direct append for reading mode
-                logger.logRenderPipeline('Output wrapped in container', {
-                    tag: this.tag,
-                    elementType: result.tagName
-                });
-                return result;
-            }
-        }
-
-        // Invalid output type
-        const errorEl = createSpan({
-            cls: 'tagverse-error',
-            text: `[Invalid output for #${this.tag}]`
-        });
-        logger.warn(
-            isLivePreview ? 'RENDER-LIVE' : 'RENDER-READING',
-            'Invalid output type',
-            { tag: this.tag, type: typeof result }
-        );
-        return errorEl;
-    }
+    protected abstract processScriptResult(result: any): HTMLElement;
 
     /**
      * Handle rendering errors

@@ -61,6 +61,50 @@ export class ReadingModeRenderer extends TagRenderer {
     }
 
     /**
+     * Process script result into an HTMLElement
+     */
+    protected processScriptResult(result: any): HTMLElement {
+        if (result === null || result === undefined) {
+            const fallback = createSpan();
+            logger.logRenderPipeline('Output fallback to original tag', {
+                tag: this.tag,
+                reason: 'null/undefined result'
+            });
+            return fallback;
+        }
+
+        if (typeof result === 'string') {
+            const stringEl = createSpan();
+            stringEl.innerHTML = result;
+            logger.logRenderPipeline('Output rendered as HTML string', {
+                tag: this.tag,
+                length: result.length
+            });
+            return stringEl;
+        }
+
+        if (result instanceof HTMLElement) {
+            // Direct append for reading mode
+            logger.logRenderPipeline('Output wrapped in container', {
+                tag: this.tag,
+                elementType: result.tagName
+            });
+            return result;
+        }
+
+        // Invalid output type
+        const errorEl = createSpan({
+            cls: 'tagverse-error',
+            text: `[Invalid output for #${this.tag}]`
+        });
+        logger.warn('RENDER-READING', 'Invalid output type', {
+            tag: this.tag,
+            type: typeof result
+        });
+        return errorEl;
+    }
+
+    /**
      * Process markdown post-processor context for reading mode
      */
     static async processMarkdown(

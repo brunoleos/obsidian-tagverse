@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [ ] Performance metrics dashboard
 - [ ] Export/import configurations
 
-## [1.0.0] - 2024-XX-XX
+## [1.0.0] - 2025-10-28
 
 ### Added
 - Initial release
@@ -75,6 +75,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### v2.0.0 (Major Release - When Ready)
 - Breaking: New context API structure
-- Plugin marketplace integration
 - Advanced caching strategies
-- Real-time collaboration features

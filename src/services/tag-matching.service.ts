@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 
 export interface MatchContext {
     tag: string;
+    args: any;
     isLivePreview: boolean;
     cursorInside: boolean;
     position: number;
@@ -60,7 +61,7 @@ export class TagMatchingService {
     /**
      * Creates a widget decoration for a tag
      */
-    createWidgetDecoration(tag: string, context: MatchContext): Decoration {
+    createWidgetDecoration(tag: string, args: any, context: MatchContext): Decoration {
         const mapping = this.tagMapping.getMapping(tag);
         if (!mapping) {
             throw new Error(`No mapping found for tag ${tag}`);
@@ -79,7 +80,8 @@ export class TagMatchingService {
             tag,
             mapping,
             file?.path || '',
-            frontmatter
+            frontmatter,
+            args
         );
 
         return Decoration.replace({

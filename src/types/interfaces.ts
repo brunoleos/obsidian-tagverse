@@ -10,6 +10,7 @@ export interface TagScriptMapping {
 export interface ScriptContext {
     app: App;
     tag: string;
+    args: any;
     element: HTMLElement;
     sourcePath: string;
     frontmatter: any;

@@ -40,10 +40,11 @@ export abstract class TagRenderer {
         return this.scriptLoader.loadScript(scriptPath, this.app);
     }
 
-    protected createScriptContext(frontmatter: any): ScriptContext {
+    protected createScriptContext(frontmatter: any, args: any = {}): ScriptContext {
         return {
             app: this.app,
             tag: this.tag,
+            args,
             element: createSpan(),
             sourcePath: this.sourcePath,
             frontmatter,
@@ -77,13 +78,14 @@ export abstract class TagRenderer {
     /**
      * Execute the tag script and return the result
      */
-    protected async executeScript(frontmatter: any): Promise<any> {
+    protected async executeScript(frontmatter: any, args: any = {}): Promise<any> {
         const groupName = this.getMode() === 'live-preview' ? 'RENDER-LIVE' : 'RENDER-READING';
         const modeName = this.getMode() === 'live-preview' ? 'Widget' : 'Reading';
 
         logger.startGroup(groupName, `${modeName} render started`, {
             tag: this.tag,
-            script: this.mapping.scriptPath
+            script: this.mapping.scriptPath,
+            hasArgs: Object.keys(args).length > 0
         });
 
         try {
@@ -96,9 +98,12 @@ export abstract class TagRenderer {
             const renderFunction = await this.loadScript(this.mapping.scriptPath);
             logger.logCacheOperation('Script loaded from cache or file', { tag: this.mapping.tag });
 
-            const scriptContext = this.createScriptContext(frontmatter);
+            const scriptContext = this.createScriptContext(frontmatter, args);
 
-            logger.logScriptExecution('Script execution started', { tag: this.mapping.tag });
+            logger.logScriptExecution('Script execution started', { 
+                tag: this.mapping.tag,
+                args: Object.keys(args).length > 0 ? args : undefined
+            });
             const result = await renderFunction(scriptContext);
 
             this.logScriptResult(result);

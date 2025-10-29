@@ -38,12 +38,59 @@ The context provides everything you need:
 {
     app: App,              // Obsidian App instance
     tag: string,           // Tag name without #
+    args: object,          // Arguments passed to the tag (NEW!)
     element: HTMLElement,  // Pre-created container
     sourcePath: string,    // Current note path
     frontmatter: object,   // Note's frontmatter
     Notice: Notice         // Obsidian Notice constructor
 }
 ```
+
+### Tag Arguments (NEW!)
+
+Tags now support JavaScript/JSON-style arguments for dynamic customization.
+
+**Syntax:** `#tagname{key: value, key2: value2}`
+
+**Supported Types:**
+- Strings: `{color: "red"}` or `{color: 'red'}`
+- Numbers: `{value: 75, max: 100}`
+- Booleans: `{enabled: true}`
+- Arrays: `{items: [1, 2, 3]}`
+- Objects: `{config: {x: 10, y: 20}}`
+
+**Examples:**
+
+```markdown
+#progress{value: 75, max: 100, color: "blue"}
+#button{action: "create-note", label: "New Note"}
+#chart{type: "pie", data: [10, 20, 30], legend: true}
+```
+
+**Accessing Arguments in Scripts:**
+
+```javascript
+function render(context) {
+    // Simple access with defaults
+    const value = context.args.value || 0;
+    const color = context.args.color || "green";
+    
+    // Destructuring with defaults
+    const { value = 0, max = 100, label = "" } = context.args;
+    
+    // Check if arguments exist
+    if (Object.keys(context.args).length === 0) {
+        // No arguments provided
+    }
+    
+    return `<span style="color: ${color}">${value}/${max}</span>`;
+}
+```
+
+**Backward Compatibility:**
+- Tags without arguments work seamlessly
+- `context.args` will be an empty object `{}`
+- Existing scripts continue to work without modification
 
 ### Return Types
 

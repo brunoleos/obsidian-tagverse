@@ -28,7 +28,8 @@ export class LivePreviewRenderer extends TagRenderer {
         tag: string,
         mapping: TagScriptMapping,
         sourcePath: string,
-        private frontmatter: any
+        private frontmatter: any,
+        private args: any = {}
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
         
@@ -39,7 +40,7 @@ export class LivePreviewRenderer extends TagRenderer {
         this._widgetType = new TagverseWidgetType(this);
         
         // Start async loading
-        this.render(frontmatter);
+        this.render(frontmatter, args);
     }
 
     getMode(): 'live-preview' {
@@ -63,7 +64,7 @@ export class LivePreviewRenderer extends TagRenderer {
     /**
      * Render the tag in live preview mode
      */
-    async render(frontmatter: any): Promise<void> {
+    async render(frontmatter: any, args: any = {}): Promise<void> {
         if (this.rendered) return;
         this.rendered = true;
 
@@ -72,7 +73,7 @@ export class LivePreviewRenderer extends TagRenderer {
 
         try {
             // Execute script and get result
-            const result = await this.executeScript(frontmatter);
+            const result = await this.executeScript(frontmatter, args);
 
             // Process the result into an HTMLElement
             const contentElement = this.processScriptResult(result);

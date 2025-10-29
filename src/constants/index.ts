@@ -18,4 +18,12 @@ export const CSS_CLASSES = {
     ERROR: 'tagverse-error'
 } as const;
 
+// Regular expressions
+export const REGEX_PATTERNS = {
+    /** Matches tags with optional arguments: #tagname or #tagname{args} */
+    TAG_ARGUMENT: /#([a-zA-Z0-9_-]+)(\{[^}]*\})?/g,
+    /** Extracts just the arguments portion from text: {key: value} */
+    ARGS_ONLY: /^\{[^}]*\}/
+} as const;
+
 // Default settings are defined in types/interfaces.ts

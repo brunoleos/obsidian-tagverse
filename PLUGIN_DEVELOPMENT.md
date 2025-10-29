@@ -20,11 +20,105 @@ The plugin consists of several layers:
 
 All components communicate through well-defined interfaces to maintain loose coupling.
 
+### Rendering Pipeline Comparison
+
+Understanding the different rendering pipelines is crucial for maintaining and extending Tagverse. The plugin must handle two fundamentally different approaches that Obsidian uses for rendering content.
+
+#### Live Preview Mode Pipeline
+
+**Input**: Raw markdown text from file  
+**Obsidian Processing**: Minimal - CodeMirror renders text with decorations  
+**Plugin Intervention Point**: During CodeMirror decoration phase (BEFORE DOM creation)  
+**Output**: Widgets embedded directly in CodeMirror editor
+
+```
+Raw Markdown File
+    ↓
+CodeMirror Editor (text-based)
+    ↓
+MatchDecorator.regexp: /#([a-zA-Z0-9_-]+)(\{[^}]*\})?/g
+    ↓ (Finds complete strings like "#progress{value:75}")
+TagParser.parseTag("#progress{value:75}")
+    ↓ (Extracts: tag="progress", args={value:75})
+Script Execution with context.args
+    ↓
+WidgetType creates custom DOM
+    ↓
+CodeMirror displays widget inline
+```
+
+**Key Characteristics:**
+- ✅ Works with **raw text** - sees complete tag strings
+- ✅ **Single-pass processing** - no DOM manipulation needed
+- ✅ **Real-time updates** - decorations rebuild on text changes
+- ✅ **Cursor-aware** - shows native tag when cursor is inside
+
+#### Reading Mode Pipeline
+
+**Input**: Raw markdown file  
+**Obsidian Processing**: Full markdown → HTML conversion  
+**Plugin Intervention Point**: After DOM creation via `registerMarkdownPostProcessor`  
+**Output**: DOM elements replacing tag links
+
+```
+Raw Markdown File
+    ↓
+Obsidian Markdown Parser
+    ↓ (Converts "#progress{value:75}" → multiple elements)
+DOM Creation:
+    <a class="tag">progress</a>{value:75}
+    ↓ (Tag and arguments are SPLIT into separate nodes)
+Plugin MarkdownPostProcessor runs
+    ↓
+Tag Reconstruction:
+    - tagEl.textContent = "progress"
+    - nextSibling.textContent = "{value:75}"
+    - Reconstruct: "#progress{value:75}"
+    ↓
+TagParser.parseTag("#progress{value:75}")
+    ↓ (Extracts: tag="progress", args={value:75})
+Script Execution with context.args
+    ↓
+DOM Replacement: tagEl + argsText → rendered widget
+```
+
+**Key Characteristics:**
+- ⚠️ Works with **processed DOM** - must reconstruct tag strings
+- ⚠️ **Post-processing** - Obsidian has already split tags and arguments
+- ⚠️ **Manual cleanup** - must remove arguments text nodes
+- ⚠️ **Two-phase**: detect tags, then render and replace
+
+#### Critical Difference: Tag Arguments Handling
+
+**The Challenge:**  
+Obsidian's markdown processor treats `{value:75}` as plain text, not part of the tag. This creates different behavior in each mode.
+
+**Live Preview Solution:**
+```typescript
+// CodeMirror's regex captures the complete pattern
+const match = text.match(/#([a-zA-Z0-9_-]+)(\{[^}]*\})?/g);
+const fullMatch = "#progress{value:75}";  // Complete string
+const parsed = TagParser.parseTag(fullMatch);  // Direct parsing
+```
+
+**Reading Mode Solution:**
+```typescript
+// Must reconstruct from split elements
+const tagName = tagEl.textContent;  // "progress"
+const argsText = nextSibling.textContent;  // "{value:75}"
+const fullTag = '#' + tagName + argsText;  // "#progress{value:75}"
+const parsed = TagParser.parseTag(fullTag);  // Same parsing logic
+
+// Then clean up
+tagEl.replaceWith(renderedWidget);
+argsTextNode.remove();  // Remove leftover arguments text
+```
+
 ### CodeMirror Integration
 
 The plugin uses CodeMirror directly in live preview mode for real-time tag editing:
 
-- **MatchDecorator**: Finds hashtag patterns using regex (`/#([a-zA-Z0-9_-]+)/g`)
+- **MatchDecorator**: Finds hashtag patterns using regex (`/#([a-zA-Z0-9_-]+)(\{[^}]*\})?/g`)
 - **Decoration.replace()**: Replaces matched tags with custom widgets
 - **WidgetType**: Wraps rendered content for CodeMirror widget system
 - **State Fields**: Monitors editor mode changes via `editorLivePreviewField`
@@ -32,6 +126,25 @@ The plugin uses CodeMirror directly in live preview mode for real-time tag editi
 - **Decoration Updates**: Rebuilds on document changes, selection changes, or mode switches
 
 Live preview requires custom CodeMirror extensions for widget integration, while reading mode uses standard Obsidian post-processing.
+
+#### Architectural Decisions
+
+**Why Not Pre-Process in Reading Mode?**  
+Obsidian doesn't expose hooks to intercept markdown **before** its internal processing. We must work with the already-processed DOM.
+
+**Why TagParser is Single Source of Truth?**  
+Both modes converge on TagParser.parseTag() after reconstructing complete tag strings. This ensures:
+- Consistent parsing logic across modes
+- Single point for tag syntax changes
+- Reduced maintenance burden
+- Identical behavior for users
+
+**Why Separate Renderers?**  
+Despite using the same parsing logic, the rendering mechanics differ fundamentally:
+- Live Preview: Widget-based, no DOM manipulation
+- Reading Mode: DOM replacement with cleanup
+
+Separating these concerns maintains clean architecture and makes each mode's logic easier to understand and test.
 
 ## Repository Structure
 

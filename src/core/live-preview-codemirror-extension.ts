@@ -11,6 +11,8 @@ import { StateField } from '@codemirror/state';
 import { TagMatchingService, MatchContext } from '../services/tag-matching.service';
 import { TagMappingStateManager } from './live-preview-state';
 import { logger } from '../utils/logger';
+import { TagParser } from '../utils/tag-parser';
+import { REGEX_PATTERNS } from '../constants';
 
 /**
  * Handles CodeMirror extension setup for live preview tag rendering
@@ -78,19 +80,24 @@ export class LivePreviewCodeMirrorExtension {
 
     /**
      * Creates the match decorator for hashtag replacement
+     * Supports both #tag and #tag{args} syntax
      */
     private createMatchDecorator(): MatchDecorator {
         return new MatchDecorator({
-            regexp: /#([a-zA-Z0-9_-]+)/g,
+            regexp: REGEX_PATTERNS.TAG_ARGUMENT,
             decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {
-                const tag = match[1];
-                const tagLength = match[0].length;
+                const fullMatch = match[0];
+                const parsed = TagParser.parseTag(fullMatch);
+                const tag = parsed.tag;
+                const args = parsed.args;
+                const tagLength = fullMatch.length;
                 const cursor = view.state.selection.main.head;
                 const isLivePreview = view.state.field(editorLivePreviewField as unknown as StateField<boolean>);
                 const cursorInside = cursor > pos - 1 && cursor < pos + tagLength + 1;
 
                 const context: MatchContext = {
                     tag,
+                    args,
                     isLivePreview: isLivePreview as boolean,
                     cursorInside,
                     position: pos,
@@ -98,7 +105,7 @@ export class LivePreviewCodeMirrorExtension {
                 };
 
                 if (this.tagMatchingService.shouldCreateWidget(context)) {
-                    return this.tagMatchingService.createWidgetDecoration(tag, context);
+                    return this.tagMatchingService.createWidgetDecoration(tag, args, context);
                 }
 
                 return null;

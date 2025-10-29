@@ -56,7 +56,7 @@ function render(context) {
         text: `Click me! (Tag: ${context.tag})`,
         cls: 'my-custom-button'
     });
-    
+
     button.addEventListener('click', () => {
         new context.Notice(`Hello from #${context.tag}! 👋`);
     });
@@ -90,10 +90,41 @@ Your render function receives a `context` object with:
 
 - `context.app`: The Obsidian App instance (full Obsidian API access)
 - `context.tag`: The tag name (without #)
+- `context.args`: Arguments passed to the tag (see Tag Arguments below)
 - `context.element`: The container element for your rendered content
 - `context.sourcePath`: The path of the current note
 - `context.frontmatter`: The note's frontmatter data
 - `context.Notice`: The Obsidian Notice constructor
+
+### Tag Arguments
+
+**NEW**: Tags now support JavaScript/JSON-style arguments for dynamic customization!
+
+**Syntax:** `#tagname{key: value, key2: value2}`
+
+Arguments are passed as a JavaScript object in `context.args`, supporting all JSON data types including strings, numbers, booleans, arrays, and nested objects.
+
+**Examples:**
+```markdown
+#progress{value: 75, max: 100, color: "blue"}
+#button{action: "create-note", label: "New Note", tags: ["project", "todo"]}
+#chart{type: "pie", data: "sales", legend: true, colors: ["#ff0000", "#00ff00"]}
+```
+
+**In your render script:**
+```javascript
+function render(context) {
+    // Access arguments with defaults
+    const value = context.args.value || 0;
+    const color = context.args.color || "green";
+    const items = context.args.items || [];
+    
+    // Use the arguments to customize rendering
+    return `<div style="color: ${color}">${value}</div>`;
+}
+```
+
+**Backward Compatibility:** Tags without arguments work seamlessly - `context.args` will be an empty object `{}`.
 
 #### Useful App Methods
 
@@ -128,14 +159,14 @@ Show how many notes use a tag:
 function render(context) {
     const files = context.app.vault.getMarkdownFiles();
     let count = 0;
-    
+
     files.forEach(file => {
         const cache = context.app.metadataCache.getFileCache(file);
         if (cache?.tags?.some(t => t.tag === '#' + context.tag)) {
             count++;
         }
     });
-    
+
     return `<span class="tag-count">📊 Used in ${count} notes</span>`;
 }
 ```
@@ -152,7 +183,7 @@ function render(context) {
         text: `🔍 Search #${context.tag}`,
         cls: 'tag-search-link'
     });
-    
+
     searchLink.addEventListener('click', (e) => {
         e.preventDefault();
         context.app.internalPlugins.getPluginById('global-search')
@@ -173,17 +204,17 @@ Show notes that share the tag:
 async function render(context) {
     const files = context.app.vault.getMarkdownFiles();
     const relatedNotes = [];
-    
+
     for (const file of files) {
         const cache = context.app.metadataCache.getFileCache(file);
         if (cache?.tags?.some(t => t.tag === '#' + context.tag)) {
             relatedNotes.push(file);
         }
     }
-    
+
     const container = context.element.createDiv({ cls: 'related-notes' });
     container.createEl('strong', { text: `Related notes (${relatedNotes.length}):` });
-    
+
     const list = container.createEl('ul');
     relatedNotes.slice(0, 5).forEach(note => {
         const li = list.createEl('li');
@@ -196,7 +227,7 @@ async function render(context) {
             context.app.workspace.openLinkText(note.path, '', false);
         });
     });
-    
+
     return container;
 }
 ```
@@ -328,6 +359,40 @@ Ready to unleash the full power of Tagverse? Here's what's next:
 - 🐛 **[Report Issues](https://github.com/brunoleos/obsidian-tagverse/issues)**: Found a bug? Let us know
 - 💬 **[Obsidian Discord](https://discord.gg/obsidianmd)**: Community support and discussions
 - 💡 **[Feature Requests](https://github.com/brunoleos/obsidian-tagverse/issues/new)**: Have an idea? Suggest it here
+
+## 🆚 Similar Plugins
+
+Tagverse makes tag-based interactivity general-purpose. Here are related plugins with more specific scopes:
+
+- **Buttons Plugin**: Creates clickable buttons for common actions (run code, open notes, etc.). Less flexible than Tagverse but simpler to use for basic workflows.
+
+- **Tasks Plugin**: Makes task items (checkboxes) interactive and provides task management features.
+
+- **Projects Plugin**: For project management with due dates and status tracking.
+
+- **Dataview**: Powers data visualization and queries, can display interactive results alongside Tagverse widgets.
+
+- **Templater**: Creates dynamic content via scripts - complementary to Tagverse for generated content.
+
+- **Meta Bind**: Allows binding metadata to form controls - similar interactivity but focused on metadata.
+
+What differentiates Tagverse is its ability to transform ANY tag into ANY interactive content using JavaScript, giving creators full control over user experiences.
+
+## 🚀 Future Roadmap
+
+### High Priority
+- **JIRA-Style Tag Matching**: Support regex patterns for tags like `PROJ-123` or `GITHUB-456`, extending beyond simple tag names
+
+### Medium Priority
+- **Context/Scopes**: Apply transformations only in specific folders, files, or based on frontmatter conditions
+- **Script Template Library**: Built-in templates for common use cases with validation and helper functions
+
+### Medium-Low Priority
+- **Hover Previews**: See rendered previews when hovering over tags in live preview mode
+- **Grouped Tag Mappings**: Organize mappings into categories with batch operations
+
+### Low Priority
+- **Performance Monitoring**: Track render times, identify slow scripts, and provide optimization recommendations
 
 ---
 

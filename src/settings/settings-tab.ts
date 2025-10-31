@@ -1,6 +1,8 @@
 import { App, PluginSettingTab, Setting, TFile } from 'obsidian';
 import TagversePlugin from '../core/plugin';
 import { TagverseSettings, TagScriptMapping } from '../types/interfaces';
+import { CommunityScriptsTab } from './community-scripts-tab';
+import { ScriptSubmissionModal } from './script-submission-modal';
 
 export class TagverseSettingTab extends PluginSettingTab {
     plugin: TagversePlugin;
@@ -15,6 +17,71 @@ export class TagverseSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         containerEl.createEl('h2', { text: 'Tagverse Settings' });
+
+        // Create tabs
+        const tabsContainer = containerEl.createDiv({ cls: 'tagverse-tabs' });
+
+        const generalTab = tabsContainer.createEl('button', {
+            text: 'General',
+            cls: 'tagverse-tab active'
+        });
+
+        const communityTab = tabsContainer.createEl('button', {
+            text: 'Community Scripts',
+            cls: 'tagverse-tab'
+        });
+
+        const submitTab = tabsContainer.createEl('button', {
+            text: 'Submit Script',
+            cls: 'tagverse-tab'
+        });
+
+        // Content containers
+        const generalContent = containerEl.createDiv({ cls: 'tagverse-tab-content active' });
+        const communityContent = containerEl.createDiv({ cls: 'tagverse-tab-content community-scripts-container' });
+        const submitContent = containerEl.createDiv({ cls: 'tagverse-tab-content' });
+
+        // Tab switching
+        generalTab.addEventListener('click', () => {
+            this.switchTab(generalTab, generalContent, [communityTab, submitTab], [communityContent, submitContent]);
+        });
+
+        communityTab.addEventListener('click', async () => {
+            this.switchTab(communityTab, communityContent, [generalTab, submitTab], [generalContent, submitContent]);
+
+            // Render community scripts
+            const communityTabInstance = new CommunityScriptsTab(
+                this.app,
+                this.plugin,
+                this.plugin.communityService
+            );
+            await communityTabInstance.render(communityContent);
+        });
+
+        submitTab.addEventListener('click', () => {
+            this.switchTab(submitTab, submitContent, [generalTab, communityTab], [generalContent, communityContent]);
+            this.renderSubmitTab(submitContent);
+        });
+
+        // Render general settings
+        this.renderGeneralSettings(generalContent);
+    }
+
+    private switchTab(
+        activeTab: HTMLElement,
+        activeContent: HTMLElement,
+        inactiveTabs: HTMLElement[],
+        inactiveContents: HTMLElement[]
+    ): void {
+        activeTab.addClass('active');
+        activeContent.addClass('active');
+
+        inactiveTabs.forEach(tab => tab.removeClass('active'));
+        inactiveContents.forEach(content => content.removeClass('active'));
+    }
+
+    private renderGeneralSettings(containerEl: HTMLElement): void {
+        containerEl.empty();
 
         // General settings
         new Setting(containerEl)
@@ -153,5 +220,42 @@ export class TagverseSettingTab extends PluginSettingTab {
                 this.display();
             });
         });
+    }
+
+    private renderSubmitTab(container: HTMLElement): void {
+        container.empty();
+
+        container.createEl('h2', { text: '🚀 Submit Your Script' });
+        container.createDiv({
+            text: 'Share your creations with the Tagverse community!',
+            cls: 'setting-item-description'
+        });
+
+        new Setting(container)
+            .setName('Submit a script')
+            .setDesc('Click to open the submission wizard')
+            .addButton(btn => btn
+                .setButtonText('Start Submission')
+                .setCta()
+                .onClick(() => {
+                    const modal = new ScriptSubmissionModal(this.app, this.plugin);
+                    modal.open();
+                })
+            );
+
+        // Add guidelines
+        const guidelines = container.createDiv({ cls: 'submission-guidelines' });
+        guidelines.innerHTML = `
+            <h3>Submission Guidelines</h3>
+            <ul>
+                <li>Scripts must have a clear, useful purpose</li>
+                <li>Code should be clean and well-commented</li>
+                <li>No malicious code (eval, unsafe network requests, etc.)</li>
+                <li>Include a good description and suggested tag</li>
+                <li>Test your script thoroughly before submitting</li>
+            </ul>
+            <p>After submission, your script will be reviewed by maintainers.
+            This typically takes 1-3 days. You'll be notified via GitHub.</p>
+        `;
     }
 }

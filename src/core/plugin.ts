@@ -12,6 +12,7 @@ import { ScriptLoaderService } from '../services/script-loader.service';
 import { TagMappingService } from '../services/tag-mapping.service';
 import { SettingsService } from '../services/settings.service';
 import { RendererFactoryService } from '../services/renderer-factory.service';
+import { CommunityScriptService } from '../services/community-script.service';
 import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../services/interfaces';
 
 export let TagversePluginInstance: TagversePlugin | null = null;
@@ -25,6 +26,7 @@ export default class TagversePlugin extends Plugin {
     private tagMapping: ITagMappingProvider;
     private settingsService: ISettingsService;
     private rendererFactory: RendererFactoryService;
+    public communityService: CommunityScriptService;
 
     // Track the last mode of the active view to detect mode changes
     private lastActiveViewMode: string | null = null;
@@ -50,8 +52,21 @@ export default class TagversePlugin extends Plugin {
             logLevel: this.settings.logLevel
         });
 
+        // Initialize community script service
+        this.communityService = new CommunityScriptService(
+            this.app,
+            () => this.settings,
+            async (settings) => await this.saveSettings(settings)
+        );
+        logger.logPluginInit('Community script service initialized');
+
         // Initialize tag mappings after settings are loaded
         this.tagMapping.rebuildMappings(this.settings.tagMappings);
+
+        // Check for script updates on startup if enabled
+        if (this.settings.checkForUpdatesOnStartup) {
+            this.checkForScriptUpdates();
+        }
 
         // Setup settings change handler
         this.settingsService.onSettingsChanged((settings) => {
@@ -211,6 +226,21 @@ export default class TagversePlugin extends Plugin {
                     logger.logPluginInit('Could not invalidate live preview decorations', error);
                 }
             }
+        }
+    }
+
+    /**
+     * Check for community script updates on startup
+     */
+    private async checkForScriptUpdates(): Promise<void> {
+        try {
+            const updates = await this.communityService.checkForUpdates();
+            if (updates.size > 0) {
+                new Notice(`${updates.size} script update(s) available. Check Community Scripts tab.`);
+            }
+        } catch (error) {
+            // Silent fail - don't bother user with update check failures
+            logger.debug('COMMUNITY', 'Update check failed', error);
         }
     }
 }

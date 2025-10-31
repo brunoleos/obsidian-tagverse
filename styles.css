@@ -47,3 +47,238 @@
     width: 100%;
     box-sizing: border-box;
 }
+
+/* ============================================
+   Community Scripts Marketplace Styles
+   ============================================ */
+
+/* Tabs */
+.tagverse-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.tagverse-tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+
+.tagverse-tab:hover {
+    color: var(--text-normal);
+}
+
+.tagverse-tab.active {
+    color: var(--interactive-accent);
+    border-bottom-color: var(--interactive-accent);
+}
+
+.tagverse-tab-content {
+    display: none;
+}
+
+.tagverse-tab-content.active {
+    display: block;
+}
+
+/* Community Scripts Controls */
+.community-scripts-controls {
+    margin-bottom: 20px;
+}
+
+.label-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+}
+
+.filter-label {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.label-filter {
+    padding: 4px 12px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+}
+
+.label-filter:hover {
+    background: var(--background-modifier-hover);
+}
+
+.label-filter.active {
+    background: var(--interactive-accent);
+    color: white;
+    border-color: var(--interactive-accent);
+}
+
+/* Script Grid */
+.scripts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.script-card {
+    position: relative;
+    padding: 16px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.script-card:hover {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.featured-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 2px 8px;
+    background: var(--color-accent);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
+.script-header h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.2em;
+}
+
+.script-author {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.script-description {
+    margin-bottom: 12px;
+    color: var(--text-normal);
+    line-height: 1.4;
+}
+
+.script-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.script-label {
+    padding: 2px 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    font-size: 0.75em;
+    color: var(--text-muted);
+}
+
+.script-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.script-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.script-actions button {
+    padding: 6px 12px;
+    font-size: 0.9em;
+}
+
+.installed-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--color-green);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.no-scripts-message {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Install Modal */
+.modal-description {
+    margin-bottom: 20px;
+    color: var(--text-muted);
+}
+
+.arguments-list {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.arguments-list li {
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.modal-button-container {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+/* Submission Guidelines */
+.submission-guidelines {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+}
+
+.submission-guidelines h3 {
+    margin-top: 0;
+}
+
+.submission-instructions {
+    line-height: 1.6;
+}
+
+.submission-instructions code {
+    background: var(--code-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .scripts-grid {
+        grid-template-columns: 1fr;
+    }
+}

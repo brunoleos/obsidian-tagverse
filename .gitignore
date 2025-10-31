@@ -60,3 +60,4 @@ Thumbs.db
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+.claude/settings.local.json

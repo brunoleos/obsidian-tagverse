@@ -8,11 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned Features
-- [ ] Script library browser
 - [ ] Visual script editor
 - [ ] Tag preview on hover
 - [ ] Performance metrics dashboard
 - [ ] Export/import configurations
+- [ ] Regex-based tag matching
+
+## [1.1.0] - TBD
+
+### Added
+- **Community Scripts Marketplace**: Browse and install scripts created by the community
+- One-click script installation with automatic updates
+- Script submission wizard: Share your scripts via auto-generated PRs
+- Label-based filtering system for script discovery (multi-label support)
+- Download tracking for popular scripts
+- Manual update mechanism for installed community scripts
+- Community Scripts tab in settings with gallery view
+- Script submission tab for easy community contributions
+- Comprehensive `COMMUNITY_SCRIPTS.md` documentation
+
+### Changed
+- Settings UI now uses tabbed interface (General / Community Scripts / Submit Script)
+- ScriptLoader now supports `community:` prefix for installed community scripts
+- Updated README with Community Scripts section
+
+### Technical
+- New `CommunityScriptService` for marketplace functionality
+- New `CommunityScriptsTab` component with search and filter UI
+- New `ScriptSubmissionModal` for generating PRs
+- Scripts downloaded to `.obsidian/plugins/tagverse/community-scripts/`
+- Registry cached for 24 hours to minimize network requests
+- Added interfaces: `CommunityScriptMetadata`, `CommunityScriptsRegistry`, `InstalledCommunityScript`, `ScriptArgument`
+- Extended `TagverseSettings` with community script options
 
 ## [1.0.0] - 2025-10-28
 
@@ -61,18 +88,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Future Roadmap
 
-### v1.1.0 (Next Minor Release)
-- Script template library
-- Improved error messages
-- Performance monitoring
+### v1.2.0 (Next Minor Release)
+- **Visual Script Builder (No-Code Mode)**: Complete form-based interface for creating scripts without coding
+  - Template gallery with 6 common script types (Counter, Badge, Progress Bar, Button, List, Stats)
+  - Step-by-step wizard with live preview
+  - Automatic code generation from visual configs
+  - Three-tier system: Templates → Visual Builder → Code Editor
+  - Covers 80% of common use cases without writing JavaScript
+  - See full design in Visual Script Builder documentation
+- Tag preview on hover in edit mode
+- Performance monitoring dashboard
+- Improved error messages with actionable guidance
 - Context menu integration
 
-### v1.2.0
-- Visual script builder
+### v1.3.0
+- Reactive/live data updates for scripts
+- Scoped rendering (folder-based)
+- Cross-tag communication (shared state)
+- Script editor with validation
 - Tag groups support
-- Conditional rendering rules
-- Script testing framework
 
 ### v2.0.0 (Major Release - When Ready)
-- Breaking: New context API structure
+- Breaking: Enhanced context API structure
+- Script sandboxing with permissions
+- TypeScript support for scripts
 - Advanced caching strategies
+- Plugin integration hooks

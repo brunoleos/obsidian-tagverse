@@ -39,6 +39,34 @@ Imagine turning `#todo-button` into an actual clickable button that adds tasks t
 3. Reload Obsidian
 4. Enable the plugin in Settings → Community Plugins
 
+## 🌟 Community Scripts
+
+Tagverse features a thriving community script library! Browse and install ready-made scripts with one click:
+
+1. Open **Settings → Tagverse → Community Scripts**
+2. Browse available scripts by label or search
+3. Click **Install** on any script
+4. Choose your custom tag name
+5. Start using it immediately!
+
+### Popular Scripts
+- **Task Counter** - Track task completion across notes
+- **Note Stats** - Display word count, links, and analytics
+- **Habit Tracker** - Daily habit checkboxes and streaks
+- **Quick Note** - Button to create new notes instantly
+- [View all scripts →](https://github.com/brunoleos/tagverse-community-scripts)
+
+### Share Your Scripts
+
+Created something useful? Share it with the community!
+
+1. Go to **Settings → Tagverse → Submit Script**
+2. Select your script file and fill in details
+3. Click **Generate Submission**
+4. Follow the instructions to create a Pull Request
+
+Your script will be reviewed and published for everyone to use!
+
 ## Usage
 
 ### Your First Dynamic Tag
@@ -381,6 +409,12 @@ What differentiates Tagverse is its ability to transform ANY tag into ANY intera
 ## 🚀 Future Roadmap
 
 ### High Priority
+- **Visual Script Builder (v1.2.0)**: No-code interface for creating scripts
+  - Form-based wizard with template gallery
+  - Six built-in script types covering 80% of use cases
+  - Live preview and automatic code generation
+  - Seamless integration with existing workflow
+  - Progressive disclosure from templates to visual builder to code editor
 - **JIRA-Style Tag Matching**: Support regex patterns for tags like `PROJ-123` or `GITHUB-456`, extending beyond simple tag names
 
 ### Medium Priority

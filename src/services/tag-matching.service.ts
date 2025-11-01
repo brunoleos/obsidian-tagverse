@@ -12,6 +12,7 @@ export interface MatchContext {
     cursorInside: boolean;
     position: number;
     cursor: number;
+    groupId?: string; // Optional logging group ID for tag processing
 }
 
 /**
@@ -30,31 +31,23 @@ export class TagMatchingService {
     shouldCreateWidget(context: MatchContext): boolean {
         const { tag, isLivePreview, cursorInside } = context;
 
-        logger.startGroup(`MATCH-${tag}`, 'Tag match processing', { tag, pos: context.position, cursor: context.cursor });
-        logger.debug('MATCH', 'Tag found', { tag, pos: context.position, cursor: context.cursor });
-
         // Check if this tag has a mapping (optimized O(1) lookup)
         const mapping = this.tagMapping.getMapping(tag);
 
         // For unmapped tags: no widget
         if (!mapping) {
-            logger.logTagMatching('Decision made', { tag, decision: 'NULL', reason: 'no mapping found', pos: context.position });
-            logger.endGroup();
+            logger.debug('TAG-MATCH', 'No mapping found, skipping', { tag, pos: context.position });
             return false;
         }
 
-        logger.debug('MATCH', 'Mode check', { tag, isLivePreview });
-
         // When cursor is inside tag (in live preview), show natively for editing
         if (isLivePreview && cursorInside) {
-            logger.logTagMatching('Decision made', { tag, decision: 'NULL', reason: 'cursor inside (show natively)', pos: context.position, cursor: context.cursor });
-            logger.endGroup();
+            logger.debug('TAG-MATCH', 'Cursor inside tag, showing natively', { tag, pos: context.position });
             return false;
         }
 
         // In live preview, show widgets for mapped tags when cursor is outside
-        logger.logTagMatching('Decision made', { tag, decision: 'REPLACE', reason: 'widget', pos: context.position, script: mapping.scriptPath });
-        logger.endGroup();
+        logger.debug('TAG-MATCH', 'Creating widget for tag', { tag, pos: context.position, script: mapping.scriptPath });
         return true;
     }
 
@@ -81,7 +74,9 @@ export class TagMatchingService {
             mapping,
             file?.path || '',
             frontmatter,
-            args
+            args,
+            context.groupId,  // Pass groupId for logging
+            context.position  // Pass position for logging
         );
 
         return Decoration.replace({

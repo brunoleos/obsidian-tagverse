@@ -55,38 +55,91 @@
 /* Tabs */
 .tagverse-tabs {
     display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-    border-bottom: 2px solid var(--background-modifier-border);
+    background-color: transparent;
+    color: var(--text-normal);
+    border-bottom: 1px solid var(--background-modifier-border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    min-height: 32px;
 }
 
-.tagverse-tab {
-    padding: 8px 16px;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
+.tagverse-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+button.tagverse-tab {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 var(--size-4-2);
     cursor: pointer;
-    font-weight: 500;
+    position: relative;
     color: var(--text-muted);
-    transition: all 0.2s;
-    margin-bottom: -2px;
+    font-size: var(--font-ui-small);
+    transition: color 0.15s ease, background-color 0.15s ease;
+    user-select: none;
+    white-space: nowrap;
+    font-weight: var(--font-normal);
+    flex-shrink: 0;
+    box-shadow: none;
+    outline: none;
+}
+
+button.tagverse-tab:focus-visible {
+    box-shadow: none;
+    outline: none;
+}
+
+.tagverse-tab .tagverse-tab-title {
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 var(--size-4-1);
+    max-width: 180px;
+}
+
+.tagverse-tab[data-state="active"],
+.tagverse-tab.active {
+    color: var(--text-normal);
+    background-color: var(--background-primary);
+    font-weight: var(--font-medium);
+    position: relative;
+}
+
+.tagverse-tab[data-state="active"]:after,
+.tagverse-tab.active:after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: var(--text-normal);
 }
 
 .tagverse-tab:hover {
     color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
 }
 
-.tagverse-tab.active {
-    color: var(--interactive-accent);
-    border-bottom-color: var(--interactive-accent);
+.tagverse-tab:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--background-modifier-border-focus);
+    outline: none;
 }
 
 .tagverse-tab-content {
     display: none;
 }
 
+.tagverse-tab-content[data-state="active"],
 .tagverse-tab-content.active {
     display: block;
+    padding-top: 20px;
 }
 
 /* Community Scripts Controls */

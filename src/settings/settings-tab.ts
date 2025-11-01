@@ -18,32 +18,88 @@ export class TagverseSettingTab extends PluginSettingTab {
 
         containerEl.createEl('h2', { text: 'Tagverse Settings' });
 
-        // Create tabs
-        const tabsContainer = containerEl.createDiv({ cls: 'tagverse-tabs' });
+        // Create tabs with proper ARIA attributes
+        const tabsContainer = containerEl.createDiv({
+            cls: 'tagverse-tabs',
+            attr: {
+                role: 'tablist',
+                'aria-orientation': 'horizontal'
+            }
+        });
 
         const generalTab = tabsContainer.createEl('button', {
-            text: 'General',
-            cls: 'tagverse-tab active'
+            type: 'button',
+            cls: 'tagverse-tab',
+            attr: {
+                role: 'tab',
+                'aria-selected': 'true',
+                'aria-controls': 'tagverse-content-general',
+                'id': 'tagverse-tab-general',
+                'data-state': 'active'
+            }
         });
+        generalTab.createSpan({ text: 'General', cls: 'tagverse-tab-title' });
 
         const communityTab = tabsContainer.createEl('button', {
-            text: 'Community Scripts',
-            cls: 'tagverse-tab'
+            type: 'button',
+            cls: 'tagverse-tab',
+            attr: {
+                role: 'tab',
+                'aria-selected': 'false',
+                'aria-controls': 'tagverse-content-community',
+                'id': 'tagverse-tab-community',
+                'data-state': 'inactive'
+            }
         });
+        communityTab.createSpan({ text: 'Community Scripts', cls: 'tagverse-tab-title' });
 
         const submitTab = tabsContainer.createEl('button', {
-            text: 'Submit Script',
-            cls: 'tagverse-tab'
+            type: 'button',
+            cls: 'tagverse-tab',
+            attr: {
+                role: 'tab',
+                'aria-selected': 'false',
+                'aria-controls': 'tagverse-content-submit',
+                'id': 'tagverse-tab-submit',
+                'data-state': 'inactive'
+            }
         });
+        submitTab.createSpan({ text: 'Submit Script', cls: 'tagverse-tab-title' });
 
-        // Content containers
-        const generalContent = containerEl.createDiv({ cls: 'tagverse-tab-content active' });
-        const communityContent = containerEl.createDiv({ cls: 'tagverse-tab-content community-scripts-container' });
-        const submitContent = containerEl.createDiv({ cls: 'tagverse-tab-content' });
+        // Content containers with proper ARIA attributes
+        const generalContent = containerEl.createDiv({
+            cls: 'tagverse-tab-content active',
+            attr: {
+                role: 'tabpanel',
+                'aria-labelledby': 'tagverse-tab-general',
+                'id': 'tagverse-content-general',
+                'data-state': 'active'
+            }
+        });
+        const communityContent = containerEl.createDiv({
+            cls: 'tagverse-tab-content community-scripts-container',
+            attr: {
+                role: 'tabpanel',
+                'aria-labelledby': 'tagverse-tab-community',
+                'id': 'tagverse-content-community',
+                'data-state': 'inactive'
+            }
+        });
+        const submitContent = containerEl.createDiv({
+            cls: 'tagverse-tab-content',
+            attr: {
+                role: 'tabpanel',
+                'aria-labelledby': 'tagverse-tab-submit',
+                'id': 'tagverse-content-submit',
+                'data-state': 'inactive'
+            }
+        });
 
         // Tab switching
         generalTab.addEventListener('click', () => {
             this.switchTab(generalTab, generalContent, [communityTab, submitTab], [communityContent, submitContent]);
+            // Re-render general settings to reflect any changes from community scripts
+            this.renderGeneralSettings(generalContent);
         });
 
         communityTab.addEventListener('click', async () => {
@@ -73,14 +129,30 @@ export class TagverseSettingTab extends PluginSettingTab {
         inactiveTabs: HTMLElement[],
         inactiveContents: HTMLElement[]
     ): void {
+        // Update active tab
         activeTab.addClass('active');
-        activeContent.addClass('active');
+        activeTab.setAttribute('aria-selected', 'true');
+        activeTab.setAttribute('data-state', 'active');
 
-        inactiveTabs.forEach(tab => tab.removeClass('active'));
-        inactiveContents.forEach(content => content.removeClass('active'));
+        // Update active content
+        activeContent.addClass('active');
+        activeContent.setAttribute('data-state', 'active');
+
+        // Update inactive tabs
+        inactiveTabs.forEach(tab => {
+            tab.removeClass('active');
+            tab.setAttribute('aria-selected', 'false');
+            tab.setAttribute('data-state', 'inactive');
+        });
+
+        // Update inactive contents
+        inactiveContents.forEach(content => {
+            content.removeClass('active');
+            content.setAttribute('data-state', 'inactive');
+        });
     }
 
-    private renderGeneralSettings(containerEl: HTMLElement): void {
+    renderGeneralSettings(containerEl: HTMLElement): void {
         containerEl.empty();
 
         // General settings
@@ -154,6 +226,9 @@ export class TagverseSettingTab extends PluginSettingTab {
             .map(file => file.path)
             .sort();
 
+        // Get community scripts
+        const communityScripts = this.plugin.settings.installedCommunityScripts || [];
+
         // Display existing mappings
         this.plugin.settings.tagMappings.forEach((mapping: TagScriptMapping, index: number) => {
             const mappingRow = containerEl.createDiv({ cls: 'tagverse-mapping-row' });
@@ -177,9 +252,26 @@ export class TagverseSettingTab extends PluginSettingTab {
             const scriptDropdownContainer = controlsContainer.createDiv({ cls: 'setting-item-control' });
             const scriptSelect = scriptDropdownContainer.createEl('select', { cls: 'script-dropdown' });
             scriptSelect.createEl('option', { text: 'Select script file...', value: '' });
-            jsFiles.forEach(path => {
-                scriptSelect.createEl('option', { text: path, value: path });
-            });
+
+            // Add community scripts section
+            if (communityScripts.length > 0) {
+                const communityGroup = scriptSelect.createEl('optgroup', { attr: { label: 'Community Scripts' } });
+                communityScripts.forEach(script => {
+                    communityGroup.createEl('option', {
+                        text: `📦 ${script.scriptId}`,
+                        value: `community:${script.scriptId}`
+                    });
+                });
+            }
+
+            // Add vault scripts section
+            if (jsFiles.length > 0) {
+                const vaultGroup = scriptSelect.createEl('optgroup', { attr: { label: 'Vault Scripts' } });
+                jsFiles.forEach(path => {
+                    vaultGroup.createEl('option', { text: path, value: path });
+                });
+            }
+
             scriptSelect.value = mapping.scriptPath;
             scriptSelect.addEventListener('change', async (e) => {
                 const settings = this.plugin.settings;

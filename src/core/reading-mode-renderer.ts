@@ -18,6 +18,8 @@ declare global {
  */
 export class ReadingModeRenderer extends TagRenderer {
     private targetElement: HTMLElement;
+    private groupId?: string;
+    private position?: number;
 
     constructor(
         scriptLoader: IScriptLoader,
@@ -26,10 +28,14 @@ export class ReadingModeRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         targetElement: HTMLElement,
-        private args: any = {}
+        private args: any = {},
+        groupId?: string,
+        position?: number
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
         this.targetElement = targetElement;
+        this.groupId = groupId;
+        this.position = position;
     }
 
     getMode(): 'reading' {
@@ -40,11 +46,25 @@ export class ReadingModeRenderer extends TagRenderer {
      * Render the tag in reading mode by replacing the target element and cleaning up arguments text
      */
     async render(frontmatter: any): Promise<void> {
+        // Reopen the tag processing group for async rendering
+        if (this.groupId && this.position !== undefined) {
+            // Reconstruct and reopen the group
+            const groupId = logger.startTagProcessingGroup(this.tag, this.position, 'reading', {
+                phase: 'async-rendering'
+            });
+            this.groupId = groupId; // Update with actual groupId in case it was recreated
+        }
+
         try {
             await this.renderSuccessfully(frontmatter);
             this.rendered = true;
         } catch (error) {
             this.handleRenderError(error);
+        } finally {
+            // Close the tag processing group
+            if (this.groupId) {
+                logger.endTagProcessingGroup(this.groupId);
+            }
         }
     }
 
@@ -225,10 +245,10 @@ export class ReadingModeRenderer extends TagRenderer {
         const tagElements = element.findAll('a.tag');
         logger.logRenderPipeline('Tags discovered in markdown', { count: tagElements.length, sourcePath: context.sourcePath });
 
-        // Process all tags in parallel
+        // Process all tags in parallel with index for logging
         await Promise.all(
-            tagElements.map(tagElement =>
-                this.processTagElement(tagElement, tagMapping, rendererFactory, context)
+            tagElements.map((tagElement, index) =>
+                this.processTagElement(tagElement, tagMapping, rendererFactory, context, index)
             )
         );
 
@@ -242,26 +262,33 @@ export class ReadingModeRenderer extends TagRenderer {
         tagElement: HTMLElement,
         tagMapping: ITagMappingProvider,
         rendererFactory: RendererFactoryService,
-        context: MarkdownPostProcessorContext
+        context: MarkdownPostProcessorContext,
+        index: number
     ): Promise<void> {
-        // Extract tag name and arguments using helper method
-        const { tag, args } = this.extractTagInfoFromElement(tagElement);
-        if (!tag) return;
-
-        logger.startGroup('TAG-PROCESSING', 'Processing individual tag', {
-            tag,
-            hasArgs: Object.keys(args).length > 0,
-            sourcePath: context.sourcePath
-        });
+        // Extract tag name early (without full parsing) for group creation
+        let tagName = tagElement.textContent?.trim();
+        if (!tagName) return;
+        if (tagName.startsWith('#')) {
+            tagName = tagName.substring(1);
+        }
 
         // Find matching script mapping
-        const mapping = tagMapping.getMapping(tag);
+        const mapping = tagMapping.getMapping(tagName);
 
         if (mapping) {
-            logger.logTagMatching('Mapping found, rendering tag', {
+            // Start tag processing group BEFORE parsing
+            const groupId = logger.startTagProcessingGroup(tagName, index, 'reading', {
+                sourcePath: context.sourcePath
+            });
+
+            // Now extract full tag info with arguments (TAG_PARSER logs will appear inside group)
+            const { tag, args } = this.extractTagInfoFromElement(tagElement);
+
+            logger.debug('TAG-MATCH', 'Mapping found, rendering tag', {
                 tag,
                 script: mapping.scriptPath,
-                hasArgs: Object.keys(args).length > 0
+                hasArgs: Object.keys(args).length > 0,
+                sourcePath: context.sourcePath
             });
 
             // Create and render the tag
@@ -270,14 +297,18 @@ export class ReadingModeRenderer extends TagRenderer {
                 mapping,
                 context.sourcePath,
                 tagElement,
-                args
+                args,
+                groupId,  // Pass groupId for logging
+                index     // Pass index as position for logging
             );
 
+            // End the initial group - it will be reopened by the renderer during async rendering
+            logger.endTagProcessingGroup(groupId);
+
+            // Render asynchronously (renderer will reopen and close the group)
             await renderer.render(context.frontmatter);
         } else {
-            logger.logTagMatching('No mapping found, skipping tag', { tag });
+            logger.debug('TAG-MATCH', 'No mapping found, skipping tag', { tag: tagName, sourcePath: context.sourcePath });
         }
-
-        logger.endGroup();
     }
 }

@@ -21,6 +21,8 @@ declare global {
  */
 export class LivePreviewRenderer extends TagRenderer {
     private _widgetType: TagverseWidgetType;
+    private groupId?: string;
+    private position?: number;
 
     constructor(
         scriptLoader: IScriptLoader,
@@ -29,16 +31,21 @@ export class LivePreviewRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         private frontmatter: any,
-        private args: any = {}
+        private args: any = {},
+        groupId?: string,
+        position?: number
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
-        
+
+        this.groupId = groupId;
+        this.position = position;
+
         // Create container immediately
         this.container = createSpan({ cls: 'tagverse-widget-container' });
-        
+
         // Create widget type wrapper
         this._widgetType = new TagverseWidgetType(this);
-        
+
         // Start async loading
         this.render(frontmatter, args);
     }
@@ -68,6 +75,15 @@ export class LivePreviewRenderer extends TagRenderer {
         if (this.rendered) return;
         this.rendered = true;
 
+        // Reopen the tag processing group for async rendering
+        if (this.groupId && this.position !== undefined) {
+            // Reconstruct and reopen the group
+            const groupId = logger.startTagProcessingGroup(this.tag, this.position, 'live-preview', {
+                phase: 'async-rendering'
+            });
+            this.groupId = groupId; // Update with actual groupId in case it was recreated
+        }
+
         // Show loading state initially
         this.container!.textContent = `Loading #${this.tag}...`;
 
@@ -86,6 +102,11 @@ export class LivePreviewRenderer extends TagRenderer {
             const errorEl = this.handleError(error);
             this.container!.innerHTML = '';
             this.container!.appendChild(errorEl);
+        } finally {
+            // Close the tag processing group
+            if (this.groupId) {
+                logger.endTagProcessingGroup(this.groupId);
+            }
         }
     }
 

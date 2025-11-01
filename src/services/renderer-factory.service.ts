@@ -23,7 +23,9 @@ export class RendererFactoryService {
         mapping: TagScriptMapping,
         sourcePath: string,
         frontmatter: any,
-        args: any = {}
+        args: any = {},
+        groupId?: string,
+        position?: number
     ): LivePreviewRenderer {
         return new LivePreviewRenderer(
             this.scriptLoader,
@@ -32,7 +34,9 @@ export class RendererFactoryService {
             mapping,
             sourcePath,
             frontmatter,
-            args
+            args,
+            groupId,
+            position
         );
     }
 
@@ -44,7 +48,9 @@ export class RendererFactoryService {
         mapping: TagScriptMapping,
         sourcePath: string,
         targetElement: HTMLElement,
-        args: any = {}
+        args: any = {},
+        groupId?: string,
+        position?: number
     ): ReadingModeRenderer {
         return new ReadingModeRenderer(
             this.scriptLoader,
@@ -53,7 +59,9 @@ export class RendererFactoryService {
             mapping,
             sourcePath,
             targetElement,
-            args
+            args,
+            groupId,
+            position
         );
     }
 }

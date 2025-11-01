@@ -82,38 +82,59 @@ export abstract class TagRenderer {
         const groupName = this.getMode() === 'live-preview' ? 'RENDER-LIVE' : 'RENDER-READING';
         const modeName = this.getMode() === 'live-preview' ? 'Widget' : 'Reading';
 
-        logger.startGroup(groupName, `${modeName} render started`, {
+        // Log render start
+        logger.debug(groupName, `${modeName} render started`, {
             tag: this.tag,
             script: this.mapping.scriptPath,
+            source: this.sourcePath,
             hasArgs: Object.keys(args).length > 0
         });
 
         try {
-            logger.logRenderPipeline('Script loading started', { 
-                tag: this.mapping.tag, 
-                script: this.mapping.scriptPath, 
-                sourcePath: this.sourcePath 
+            // Script loading phase
+            logger.debug('SCRIPT-LOAD', `Loading script for #${this.tag}`, {
+                script: this.mapping.scriptPath,
+                tag: this.tag
             });
-            
-            const renderFunction = await this.loadScript(this.mapping.scriptPath);
-            logger.logCacheOperation('Script loaded from cache or file', { tag: this.mapping.tag });
 
+            const renderFunction = await this.loadScript(this.mapping.scriptPath);
+
+            logger.debug('SCRIPT-LOAD', `Script loaded for #${this.tag}`, {
+                script: this.mapping.scriptPath,
+                cached: true
+            });
+
+            // Script execution phase
             const scriptContext = this.createScriptContext(frontmatter, args);
 
-            logger.logScriptExecution('Script execution started', { 
-                tag: this.mapping.tag,
-                args: Object.keys(args).length > 0 ? args : undefined
+            logger.debug('SCRIPT-EXEC', `Executing script for #${this.tag}`, {
+                tag: this.tag,
+                script: this.mapping.scriptPath,
+                hasArgs: Object.keys(args).length > 0,
+                sourcePath: this.sourcePath
             });
+
             const result = await renderFunction(scriptContext);
 
+            // Output processing phase
             this.logScriptResult(result);
+
+            // Success summary
+            logger.debug(groupName, `✓ ${modeName} render complete`, {
+                tag: this.tag,
+                success: true,
+                resultType: result instanceof HTMLElement ? 'HTMLElement' : typeof result
+            });
 
             return result;
         } catch (error) {
-            logger.logErrorHandling(`${modeName} rendering failed`, error);
+            logger.error('RENDER-PIPELINE', `${modeName} rendering failed`, {
+                tag: this.tag,
+                script: this.mapping.scriptPath,
+                error
+            });
+
             throw error;
-        } finally {
-            logger.endGroup();
         }
     }
 
@@ -126,12 +147,14 @@ export abstract class TagRenderer {
      * Handle rendering errors
      */
     protected handleError(error: Error): HTMLElement {
-        logger.logErrorHandling(`${this.getMode()} rendering error`, error);
-
-        this.app.workspace.onLayoutReady(() => {
-            new Notice(`Error rendering tag #${this.mapping.tag}: ${error.message}`);
+        logger.error('ERROR-HANDLING', `${this.getMode()} rendering error`, {
+            tag: this.tag,
+            script: this.mapping.scriptPath,
+            error
         });
 
+        // Don't show notice here - logger already handles it
+        // Just create error element for inline display
         return createSpan({
             cls: 'tagverse-error',
             text: `[Error: #${this.mapping.tag}]`

@@ -27,6 +27,7 @@ export default class TagversePlugin extends Plugin {
     private settingsService: ISettingsService;
     private rendererFactory: RendererFactoryService;
     public communityService: CommunityScriptService;
+    public settingTab: TagverseSettingTab | null = null;
 
     // Track the last mode of the active view to detect mode changes
     private lastActiveViewMode: string | null = null;
@@ -111,7 +112,8 @@ export default class TagversePlugin extends Plugin {
         );
 
         // Add settings tab
-        this.addSettingTab(new TagverseSettingTab(this.app, this));
+        this.settingTab = new TagverseSettingTab(this.app, this);
+        this.addSettingTab(this.settingTab);
         logger.logPluginInit('Settings tab added');
 
         // Add command to refresh current view

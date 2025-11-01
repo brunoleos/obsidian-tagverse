@@ -87,13 +87,25 @@ export class LivePreviewCodeMirrorExtension {
             regexp: REGEX_PATTERNS.TAG_ARGUMENT,
             decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {
                 const fullMatch = match[0];
-                const parsed = TagParser.parseTag(fullMatch);
-                const tag = parsed.tag;
-                const args = parsed.args;
+
+                // Extract tag name early (before full parsing) for group creation
+                const tagNameMatch = fullMatch.match(/^#([a-zA-Z0-9_-]+)/);
+                const tagName = tagNameMatch ? tagNameMatch[1] : 'unknown';
+
                 const tagLength = fullMatch.length;
                 const cursor = view.state.selection.main.head;
                 const isLivePreview = view.state.field(editorLivePreviewField as unknown as StateField<boolean>);
                 const cursorInside = cursor > pos - 1 && cursor < pos + tagLength + 1;
+
+                // Start tag processing group BEFORE parsing (so parser logs appear inside)
+                const groupId = logger.startTagProcessingGroup(tagName, pos, 'live-preview', {
+                    cursorInside
+                });
+
+                // Now parse (TAG_PARSER logs will appear inside the group)
+                const parsed = TagParser.parseTag(fullMatch);
+                const tag = parsed.tag;
+                const args = parsed.args;
 
                 const context: MatchContext = {
                     tag,
@@ -101,14 +113,22 @@ export class LivePreviewCodeMirrorExtension {
                     isLivePreview: isLivePreview as boolean,
                     cursorInside,
                     position: pos,
-                    cursor
+                    cursor,
+                    groupId  // Pass groupId through context
                 };
 
-                if (this.tagMatchingService.shouldCreateWidget(context)) {
-                    return this.tagMatchingService.createWidgetDecoration(tag, args, context);
+                let decoration = null;
+                try {
+                    if (this.tagMatchingService.shouldCreateWidget(context)) {
+                        decoration = this.tagMatchingService.createWidgetDecoration(tag, args, context);
+                    }
+                } finally {
+                    // End tag processing group
+                    // Note: For async rendering, the group will be reopened in the renderer
+                    logger.endTagProcessingGroup(groupId);
                 }
 
-                return null;
+                return decoration;
             }
         });
     }

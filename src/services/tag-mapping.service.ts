@@ -22,11 +22,27 @@ export class TagMappingService implements ITagMappingProvider {
     rebuildMappings(mappings: TagScriptMapping[]): void {
         this.normalizedTagMap.clear();
 
-        mappings.forEach((mapping) => {
-            if (mapping.enabled) {
-                this.normalizedTagMap.set(mapping.tag.toLowerCase(), { ...mapping });
-            }
-        });
+        if (mappings.length > 0) {
+            logger.startLoopGroup('TAG-MAPPING', 'Rebuilding tag mappings', {
+                totalMappings: mappings.length
+            });
+
+            mappings.forEach((mapping) => {
+                if (mapping.enabled) {
+                    this.normalizedTagMap.set(mapping.tag.toLowerCase(), { ...mapping });
+                    logger.logLoopIteration('TAG-MAPPING', 'Mapping enabled', {
+                        tag: mapping.tag,
+                        script: mapping.scriptPath
+                    });
+                } else {
+                    logger.logLoopIteration('TAG-MAPPING', 'Mapping disabled (skipped)', {
+                        tag: mapping.tag
+                    });
+                }
+            });
+
+            logger.endLoopGroup();
+        }
 
         logger.logPluginInit('Tag mappings rebuilt', {
             totalMappings: mappings.length,

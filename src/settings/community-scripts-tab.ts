@@ -1,4 +1,4 @@
-import { App, Setting, Modal, Notice } from 'obsidian';
+import { App, Notice, Setting } from 'obsidian';
 import TagversePlugin from '../core/plugin';
 import { CommunityScriptMetadata } from '../types/interfaces';
 import { CommunityScriptService } from '../services/community-script.service';
@@ -174,7 +174,14 @@ export class CommunityScriptsTab {
                     cls: 'mod-cta'
                 });
                 updateBtn.addEventListener('click', async () => {
-                    await this.handleUpdate(script.id);
+                    updateBtn.disabled = true;
+                    updateBtn.setText('Updating...');
+                    try {
+                        await this.handleUpdate(script.id, updateBtn);
+                    } catch (error) {
+                        updateBtn.disabled = false;
+                        updateBtn.setText(`Update to v${script.version}`);
+                    }
                 });
             }
 
@@ -183,7 +190,14 @@ export class CommunityScriptsTab {
                 cls: 'mod-warning'
             });
             uninstallBtn.addEventListener('click', async () => {
-                await this.handleUninstall(script.id);
+                uninstallBtn.disabled = true;
+                uninstallBtn.setText('Uninstalling...');
+                try {
+                    await this.handleUninstall(script.id, uninstallBtn);
+                } catch (error) {
+                    uninstallBtn.disabled = false;
+                    uninstallBtn.setText('Uninstall');
+                }
             });
         } else {
             // Not installed - show install button
@@ -191,8 +205,18 @@ export class CommunityScriptsTab {
                 text: 'Install',
                 cls: 'mod-cta'
             });
-            installBtn.addEventListener('click', () => {
-                this.showInstallModal(script);
+            installBtn.addEventListener('click', async () => {
+                // Disable button and show loading state
+                installBtn.disabled = true;
+                installBtn.setText('Installing...');
+
+                try {
+                    await this.handleInstall(script.id, installBtn);
+                } catch (error) {
+                    // Re-enable button on error
+                    installBtn.disabled = false;
+                    installBtn.setText('Install');
+                }
             });
         }
 
@@ -203,126 +227,77 @@ export class CommunityScriptsTab {
         });
     }
 
-    private showInstallModal(script: CommunityScriptMetadata): void {
-        const modal = new ScriptInstallModal(
-            this.app,
-            script,
-            async (customTag: string) => {
-                await this.handleInstall(script.id, customTag);
-            }
-        );
-        modal.open();
-    }
-
-    private async handleInstall(scriptId: string, customTag: string): Promise<void> {
+    private async handleInstall(scriptId: string, button?: HTMLButtonElement): Promise<void> {
         try {
-            await this.communityService.installScript(scriptId, customTag);
+            if (button) {
+                button.setText('Downloading...');
+            }
+
+            await this.communityService.installScript(scriptId);
             await this.plugin.saveSettings(this.plugin.settings);
 
-            // Re-render to show updated state
-            const container = document.querySelector('.community-scripts-container') as HTMLElement;
-            if (container) {
-                await this.render(container);
+            if (button) {
+                button.setText('Installed ✓');
             }
+
+            // Re-render community scripts tab to show updated state after a brief delay
+            setTimeout(async () => {
+                const container = document.querySelector('.community-scripts-container') as HTMLElement;
+                if (container) {
+                    await this.render(container);
+                }
+            }, 500);
         } catch (error) {
             new Notice(`Installation failed: ${error.message}`);
+            throw error; // Re-throw so button can be re-enabled
         }
     }
 
-    private async handleUpdate(scriptId: string): Promise<void> {
+    private async handleUpdate(scriptId: string, button?: HTMLButtonElement): Promise<void> {
         try {
+            if (button) {
+                button.setText('Downloading...');
+            }
+
             await this.communityService.updateScript(scriptId);
             await this.plugin.saveSettings(this.plugin.settings);
 
-            // Re-render
-            const container = document.querySelector('.community-scripts-container') as HTMLElement;
-            if (container) {
-                await this.render(container);
+            if (button) {
+                button.setText('Updated ✓');
             }
+
+            // Re-render community scripts tab after a brief delay
+            setTimeout(async () => {
+                const container = document.querySelector('.community-scripts-container') as HTMLElement;
+                if (container) {
+                    await this.render(container);
+                }
+            }, 500);
         } catch (error) {
             new Notice(`Update failed: ${error.message}`);
+            throw error;
         }
     }
 
-    private async handleUninstall(scriptId: string): Promise<void> {
+    private async handleUninstall(scriptId: string, button?: HTMLButtonElement): Promise<void> {
         try {
             await this.communityService.uninstallScript(scriptId);
             await this.plugin.saveSettings(this.plugin.settings);
 
-            // Re-render
-            const container = document.querySelector('.community-scripts-container') as HTMLElement;
-            if (container) {
-                await this.render(container);
+            if (button) {
+                button.setText('Uninstalled ✓');
             }
+
+            // Re-render community scripts tab after a brief delay
+            setTimeout(async () => {
+                const container = document.querySelector('.community-scripts-container') as HTMLElement;
+                if (container) {
+                    await this.render(container);
+                }
+            }, 500);
         } catch (error) {
             new Notice(`Uninstall failed: ${error.message}`);
+            throw error;
         }
-    }
-}
-
-class ScriptInstallModal extends Modal {
-    private customTag: string;
-
-    constructor(
-        app: App,
-        private script: CommunityScriptMetadata,
-        private onInstall: (customTag: string) => Promise<void>
-    ) {
-        super(app);
-        this.customTag = script.suggestedTag;
-    }
-
-    onOpen(): void {
-        const { contentEl } = this;
-        contentEl.empty();
-
-        contentEl.createEl('h2', { text: `Install ${this.script.name}` });
-        contentEl.createDiv({ text: this.script.description, cls: 'modal-description' });
-
-        // Tag input
-        new Setting(contentEl)
-            .setName('Tag name')
-            .setDesc('Choose which tag this script will render (without #)')
-            .addText(text => text
-                .setValue(this.customTag)
-                .onChange(value => this.customTag = value)
-            );
-
-        // Arguments info
-        if (this.script.arguments && this.script.arguments.length > 0) {
-            contentEl.createEl('h3', { text: 'Available arguments:' });
-            const argsList = contentEl.createEl('ul', { cls: 'arguments-list' });
-            this.script.arguments.forEach(arg => {
-                const li = argsList.createEl('li');
-                li.innerHTML = `<code>${arg.name}</code> (${arg.type}): ${arg.description}`;
-                if (arg.default !== undefined) {
-                    li.innerHTML += ` <em>Default: ${JSON.stringify(arg.default)}</em>`;
-                }
-            });
-        }
-
-        // Buttons
-        const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-
-        const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-        cancelBtn.addEventListener('click', () => this.close());
-
-        const installBtn = buttonContainer.createEl('button', {
-            text: 'Install',
-            cls: 'mod-cta'
-        });
-        installBtn.addEventListener('click', async () => {
-            if (!this.customTag.trim()) {
-                new Notice('Please enter a tag name');
-                return;
-            }
-            await this.onInstall(this.customTag);
-            this.close();
-        });
-    }
-
-    onClose(): void {
-        const { contentEl } = this;
-        contentEl.empty();
     }
 }

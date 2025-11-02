@@ -107,19 +107,7 @@ export class InstantLogger {
     }
 
     private formatUserMessage(component: string, event: string): string {
-        const componentMap: Record<string, string> = {
-            'COMMUNITY': 'Community Scripts',
-            'SCRIPT-EXEC': 'Script Execution',
-            'SCRIPT-CACHE': 'Script Cache',
-            'SCRIPT-LOADER': 'Script Loader',
-            'RENDER-PIPELINE': 'Rendering',
-            'WIDGET': 'Widget',
-            'PLUGIN-INIT': 'Plugin',
-            'TAG-MATCH': 'Tag Matching',
-            'ERROR-HANDLING': 'Error Handler'
-        };
-
-        const friendlyComponent = componentMap[component] || component;
+        const friendlyComponent = component.replace(/-/g, ' ').toLowerCase();
         const friendlyEvent = event.replace(/_/g, ' ').toLowerCase();
         return `${friendlyComponent}: ${friendlyEvent}`;
     }

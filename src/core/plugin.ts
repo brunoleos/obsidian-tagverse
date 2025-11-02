@@ -3,7 +3,7 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { createScopedLogger, ScopedLogger, LogCategory } from '../utils/logger';
+import { withLogScope, emit, LogCategory } from '../utils/logger';
 import { LivePreviewRenderer } from './live-preview-renderer';
 import { ReadingModeRenderer } from './reading-mode-renderer';
 import { TagverseSettingTab } from '../settings/settings-tab';
@@ -41,36 +41,34 @@ export default class TagversePlugin extends Plugin {
 
     async onload() {
         // Execute plugin initialization with auto-flush
-        await createScopedLogger('🚀 Plugin Initialization').execute(async (initLogger) => {
-            initLogger.info('PLUGIN-INIT', 'Plugin initialization started');
+        await withLogScope('🚀 Plugin Initialization', async () => {
+            emit('debug', 'PLUGIN-INIT', 'Plugin initialization started');
 
             TagversePluginInstance = this;
 
             // Initialize services with nested scope
-            await initLogger.withScope('📦 Service Initialization', async (serviceLogger) => {
+            await withLogScope('📦 Service Initialization', async () => {
                 this.initializeServices();
-                serviceLogger.info('PLUGIN-INIT', 'ScriptLoader, TagMapping, Settings, and RendererFactory created');
+                emit('debug', 'PLUGIN-INIT', 'ScriptLoader, TagMapping, Settings, and RendererFactory created');
             });
 
             // Load settings with nested scope
-            await initLogger.withScope('⚙️ Settings Loading', async (settingsLogger) => {
+            await withLogScope('⚙️ Settings Loading', async () => {
                 await this.settingsService.loadSettings();
-                settingsLogger.info('PLUGIN-INIT', 'Settings loaded', {
+                emit('debug', 'PLUGIN-INIT', 'Settings loaded', {
                     refreshOnFileChange: this.settings.refreshOnFileChange,
                     logLevel: this.settings.logLevel
                 });
             });
 
             // Initialize community script service with nested scope
-            await initLogger.withScope('🌐 Community Service Init', async (communityInitLogger) => {
-                const communityLogger = createScopedLogger('Community Scripts');
+            await withLogScope('🌐 Community Service Init', async () => {
                 this.communityService = new CommunityScriptService(
                     this.app,
                     () => this.settings,
-                    async (settings) => await this.saveSettings(settings),
-                    communityLogger
+                    async (settings) => await this.saveSettings(settings)
                 );
-                communityInitLogger.info('PLUGIN-INIT', 'Community script service initialized');
+                emit('debug', 'PLUGIN-INIT', 'Community script service initialized');
             });
 
             // Initialize tag mappings after settings are loaded
@@ -78,9 +76,9 @@ export default class TagversePlugin extends Plugin {
 
             // Check for script updates on startup if enabled (before registering callback to avoid duplicate rebuilds)
             if (this.settings.checkForUpdatesOnStartup) {
-                await initLogger.withScope('🔄 Update Check', async (updateLogger) => {
+                await withLogScope('🔄 Update Check', async () => {
                     await this.checkForScriptUpdates();
-                    updateLogger.info('PLUGIN-INIT', 'Script update check completed');
+                    emit('debug', 'PLUGIN-INIT', 'Script update check completed');
                 });
             }
 
@@ -90,7 +88,7 @@ export default class TagversePlugin extends Plugin {
             });
 
             // Register processors and event handlers with nested scope
-            await initLogger.withScope('📝 Registration Phase', async (registrationLogger) => {
+            await withLogScope('📝 Registration Phase', async () => {
                 // Register markdown post processor for reading mode
                 this.registerMarkdownPostProcessor((element, context) => {
                     // Only process when view is actually in reading/preview mode
@@ -106,7 +104,7 @@ export default class TagversePlugin extends Plugin {
                         context
                     );
                 });
-                registrationLogger.info('PLUGIN-INIT', 'Markdown post processor registered');
+                emit('debug', 'PLUGIN-INIT', 'Markdown post processor registered');
 
                 // Register live preview processor (source mode will show plain text)
                 this.registerEditorExtension(
@@ -116,7 +114,7 @@ export default class TagversePlugin extends Plugin {
                         this.rendererFactory
                     )
                 );
-                registrationLogger.info('PLUGIN-INIT', 'Live preview processor registered');
+                emit('debug', 'PLUGIN-INIT', 'Live preview processor registered');
 
                 // Register event for file changes if enabled
                 this.registerEvent(
@@ -133,12 +131,12 @@ export default class TagversePlugin extends Plugin {
                         this.checkForModeChange();
                     })
                 );
-                registrationLogger.info('PLUGIN-INIT', 'Event handlers registered');
+                emit('debug', 'PLUGIN-INIT', 'Event handlers registered');
 
                 // Add settings tab
                 this.settingTab = new TagverseSettingTab(this.app, this);
                 this.addSettingTab(this.settingTab);
-                registrationLogger.info('PLUGIN-INIT', 'Settings tab added');
+                emit('debug', 'PLUGIN-INIT', 'Settings tab added');
 
                 // Add command to refresh current view
                 this.addCommand({
@@ -159,10 +157,10 @@ export default class TagversePlugin extends Plugin {
                         new Notice('Script cache cleared');
                     }
                 });
-                registrationLogger.info('PLUGIN-INIT', 'Commands registered');
+                emit('debug', 'PLUGIN-INIT', 'Commands registered');
             });
 
-            initLogger.info('PLUGIN-INIT', 'Plugin loaded successfully');
+            emit('info', 'PLUGIN-INIT', 'Plugin loaded successfully');
         }); // Auto-flushes here
     }
 
@@ -175,12 +173,9 @@ export default class TagversePlugin extends Plugin {
      * Initialize all services with proper dependency injection
      */
     private initializeServices(): void {
-        // Create logger instances for services
-        const tagMappingLogger = createScopedLogger('Tag Mapping');
-
-        // Create service instances
+        // Create service instances (no longer need logger parameters)
         this.scriptLoader = new ScriptLoaderService();
-        this.tagMapping = new TagMappingService(tagMappingLogger);
+        this.tagMapping = new TagMappingService();
         this.settingsService = new SettingsService(this);
         this.rendererFactory = new RendererFactoryService(
             this.scriptLoader,

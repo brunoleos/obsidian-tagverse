@@ -3,7 +3,6 @@ import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader } from './interfaces';
 import { LivePreviewRenderer } from '../core/live-preview-renderer';
 import { ReadingModeRenderer } from '../core/reading-mode-renderer';
-import { createScopedLogger } from '../utils/logger';
 
 /**
  * Factory service for creating renderer instances.
@@ -26,9 +25,6 @@ export class RendererFactoryService {
         frontmatter: any,
         args: any = {}
     ): LivePreviewRenderer {
-        // Create operation-specific scoped logger
-        const logger = createScopedLogger(`🎨 Rendering #${tag}`);
-
         return new LivePreviewRenderer(
             this.scriptLoader,
             this.app,
@@ -36,8 +32,7 @@ export class RendererFactoryService {
             mapping,
             sourcePath,
             frontmatter,
-            args,
-            logger
+            args
         );
     }
 
@@ -53,13 +48,6 @@ export class RendererFactoryService {
         groupId?: string,
         position?: number
     ): ReadingModeRenderer {
-        // Create operation-specific scoped logger with position info
-        const label = position !== undefined
-            ? `📖 Processing #${tag} at pos:${position}`
-            : `📖 Processing #${tag}`;
-
-        const logger = createScopedLogger(label);
-
         return new ReadingModeRenderer(
             this.scriptLoader,
             this.app,
@@ -68,7 +56,7 @@ export class RendererFactoryService {
             sourcePath,
             targetElement,
             args,
-            logger
+            position
         );
     }
 }

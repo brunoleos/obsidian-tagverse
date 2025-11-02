@@ -1,5 +1,5 @@
 import { App, TFile } from 'obsidian';
-import { createScopedLogger } from '../utils/logger';
+import { withLogScope, emit } from '../utils/logger';
 import { IScriptLoader } from './interfaces';
 
 export class ScriptLoaderService implements IScriptLoader {
@@ -8,181 +8,202 @@ export class ScriptLoaderService implements IScriptLoader {
     constructor() {}
 
     async loadScript(scriptPath: string, app: App): Promise<Function> {
-        return await createScopedLogger(`📜 Load Script: ${scriptPath}`).execute(async (loadLogger) => {
+        // 🔮 THE MAGIC: Create ambient context with withLogScope
+        return await withLogScope(`📜 Load Script: ${scriptPath}`, async () => {
             // Handle community scripts
             if (scriptPath.startsWith('community:')) {
                 return this.loadCommunityScript(scriptPath, app);
             }
 
-            // Check cache first
-            const cachedScript = await loadLogger.withScope('💾 Cache Check', async (cacheLogger) => {
-                if (this.scriptCache.has(scriptPath)) {
-                    cacheLogger.debug('CACHE', 'Cache hit');
-                    return this.scriptCache.get(scriptPath)!;
-                }
-                cacheLogger.debug('CACHE', 'Cache miss');
-                return null;
-            });
-
+            // 🔮 Check cache - this method can emit without receiving a logger!
+            const cachedScript = await this.checkCache(scriptPath);
             if (cachedScript) {
                 return cachedScript;
             }
 
-            // Load the script file
-            const file = await loadLogger.withScope('📖 File Read', async (fileLogger) => {
-                const file = app.vault.getAbstractFileByPath(scriptPath);
+            // 🔮 Load and parse script - these methods emit automatically!
+            const file = await this.locateScriptFile(scriptPath, app);
+            const scriptContent = await this.readScriptContent(file, scriptPath, app);
+            const scriptFunction = await this.createScriptFunction(scriptContent, scriptPath);
 
-                if (!file || !(file instanceof TFile)) {
-                    fileLogger.error('SCRIPT-LOADER', 'Script file not found', {
-                        script: scriptPath,
-                        fileType: typeof file
-                    });
-                    throw new Error(`Script file not found or not a file: ${scriptPath}`);
-                }
+            // 🔮 Cache the result
+            await this.cacheScript(scriptPath, scriptFunction);
 
-                fileLogger.debug('SCRIPT-LOADER', 'File located in vault');
-                return file;
-            });
-
-            const scriptContent = await loadLogger.withScope('📄 Read Content', async (readLogger) => {
-                try {
-                    const content = await app.vault.read(file);
-                    readLogger.debug('SCRIPT-LOADER', 'Script content read', {
-                        contentLength: content.length
-                    });
-                    return content;
-                } catch (error) {
-                    readLogger.error('SCRIPT-LOADER', 'Failed to read script file', { error });
-                    throw new Error(`Failed to load script "${scriptPath}": ${error.message}`);
-                }
-            });
-
-            const scriptFunction = await loadLogger.withScope('⚙️ Create Function', async (funcLogger) => {
-                try {
-                    // Wrap in async function to support await
-                    const wrappedScript = `
-                        return (async function(context) {
-                            const Notice = context.Notice;
-                            ${scriptContent}
-
-                            // If render function is defined, call it
-                            if (typeof render === 'function') {
-                                return await render(context);
-                            }
-
-                            throw new Error('No render() function found in script');
-                        });
-                    `;
-
-                    const func = new Function(wrappedScript)();
-                    funcLogger.debug('SCRIPT-LOADER', 'Script function created');
-                    return func;
-                } catch (error) {
-                    funcLogger.error('SCRIPT-LOADER', 'Failed to parse script', { error });
-                    throw new Error(`Failed to parse script "${scriptPath}": ${error.message}`);
-                }
-            });
-
-            // Cache the function
-            await loadLogger.withScope('💾 Cache Store', async (storeLogger) => {
-                this.scriptCache.set(scriptPath, scriptFunction);
-                storeLogger.debug('SCRIPT-LOADER', 'Script cached');
-            });
-
-            loadLogger.info('SCRIPT-LOADER', 'Script loaded successfully');
+            emit('debug', 'SCRIPT-LOADER', 'Script loaded successfully');
             return scriptFunction;
         }); // Auto-flush
     }
 
     /**
+     * 🔮 THE MAGIC: This method can emit logs without receiving a logger parameter!
+     * Logs automatically go to the current ambient scope.
+     */
+    private async checkCache(scriptPath: string): Promise<Function | null> {
+        return await withLogScope('💾 Cache Check', async () => {
+            if (this.scriptCache.has(scriptPath)) {
+                emit('debug', 'CACHE', 'Cache hit');
+                return this.scriptCache.get(scriptPath)!;
+            }
+            emit('debug', 'CACHE', 'Cache miss');
+            return null;
+        });
+    }
+
+    /**
+     * 🔮 THE MAGIC: Inner function emits to ambient scope!
+     */
+    private async locateScriptFile(scriptPath: string, app: App): Promise<TFile> {
+        return await withLogScope('📖 File Read', async () => {
+            const file = app.vault.getAbstractFileByPath(scriptPath);
+
+            if (!file || !(file instanceof TFile)) {
+                emit('error', 'SCRIPT-LOADER', 'Script file not found', {
+                    script: scriptPath,
+                    fileType: typeof file
+                });
+                throw new Error(`Script file not found or not a file: ${scriptPath}`);
+            }
+
+            emit('debug', 'SCRIPT-LOADER', 'File located in vault');
+            return file;
+        });
+    }
+
+    /**
+     * 🔮 THE MAGIC: Another inner function using ambient scope!
+     */
+    private async readScriptContent(file: TFile, scriptPath: string, app: App): Promise<string> {
+        return await withLogScope('📄 Read Content', async () => {
+            try {
+                const content = await app.vault.read(file);
+                emit('debug', 'SCRIPT-LOADER', 'Script content read', {
+                    contentLength: content.length
+                });
+                return content;
+            } catch (error) {
+                emit('error', 'SCRIPT-LOADER', 'Failed to read script file', { error });
+                throw new Error(`Failed to load script "${scriptPath}": ${error.message}`);
+            }
+        });
+    }
+
+    /**
+     * 🔮 THE MAGIC: Script function creation with automatic logging!
+     */
+    private async createScriptFunction(scriptContent: string, scriptPath: string): Promise<Function> {
+        return await withLogScope('⚙️ Create Function', async () => {
+            try {
+                // Wrap in async function to support await
+                const wrappedScript = `
+                    return (async function(context) {
+                        const Notice = context.Notice;
+                        ${scriptContent}
+
+                        // If render function is defined, call it
+                        if (typeof render === 'function') {
+                            return await render(context);
+                        }
+
+                        throw new Error('No render() function found in script');
+                    });
+                `;
+
+                const func = new Function(wrappedScript)();
+                emit('debug', 'SCRIPT-LOADER', 'Script function created');
+                return func;
+            } catch (error) {
+                emit('error', 'SCRIPT-LOADER', 'Failed to parse script', { error });
+                throw new Error(`Failed to parse script "${scriptPath}": ${error.message}`);
+            }
+        });
+    }
+
+    /**
+     * 🔮 THE MAGIC: Caching with automatic scope inheritance!
+     */
+    private async cacheScript(scriptPath: string, scriptFunction: Function): Promise<void> {
+        return await withLogScope('💾 Cache Store', async () => {
+            this.scriptCache.set(scriptPath, scriptFunction);
+            emit('debug', 'SCRIPT-LOADER', 'Script cached');
+        });
+    }
+
+    /**
      * Load a community script from plugin data folder
+     * 🔮 THE MAGIC: Now uses ambient context throughout!
      */
     private async loadCommunityScript(scriptPath: string, app: App): Promise<Function> {
         const scriptId = scriptPath.replace('community:', '');
         const cacheKey = `community:${scriptId}`;
 
-        return await createScopedLogger(`📦 Load Community Script: ${scriptId}`).execute(async (loadLogger) => {
+        return await withLogScope(`📦 Load Community Script: ${scriptId}`, async () => {
             // Check cache
-            const cachedScript = await loadLogger.withScope('💾 Cache Check', async (cacheLogger) => {
-                if (this.scriptCache.has(cacheKey)) {
-                    cacheLogger.debug('SCRIPT-LOADER', 'Cache hit');
-                    return this.scriptCache.get(cacheKey)!;
-                }
-                cacheLogger.debug('SCRIPT-LOADER', 'Cache miss');
-                return null;
-            });
-
+            const cachedScript = await this.checkCommunityCache(cacheKey);
             if (cachedScript) {
                 return cachedScript;
             }
 
             // Read from plugin data folder
-            const scriptContent = await loadLogger.withScope('📖 Read from Adapter', async (readLogger) => {
-                const localPath = `community-scripts/${scriptId}.js`;
-                const adapter = app.vault.adapter;
-                const fullPath = `.obsidian/plugins/tagverse/${localPath}`;
-
-                try {
-                    const content = await adapter.read(fullPath);
-                    readLogger.debug('SCRIPT-LOADER', 'Community script file read', {
-                        fullPath,
-                        contentLength: content.length
-                    });
-                    return content;
-                } catch (error) {
-                    readLogger.error('SCRIPT-LOADER', 'Failed to read community script file', {
-                        fullPath,
-                        error
-                    });
-                    throw new Error(`Failed to read community script file "${scriptId}": ${error.message}`);
-                }
-            });
-
-            const scriptFunction = await loadLogger.withScope('⚙️ Create Function', async (funcLogger) => {
-                try {
-                    // Wrap in async function to support await (same pattern as loadScript)
-                    const wrappedScript = `
-                        return (async function(context) {
-                            const Notice = context.Notice;
-                            ${scriptContent}
-
-                            // If render function is defined, call it
-                            if (typeof render === 'function') {
-                                return await render(context);
-                            }
-
-                            throw new Error('No render() function found in script');
-                        });
-                    `;
-
-                    const func = new Function(wrappedScript)();
-                    funcLogger.debug('SCRIPT-LOADER', 'Community script function created');
-                    return func;
-                } catch (error) {
-                    funcLogger.error('SCRIPT-LOADER', 'Failed to parse community script', { error });
-                    throw new Error(`Failed to parse community script "${scriptId}": ${error.message}`);
-                }
-            });
+            const scriptContent = await this.readCommunityScript(scriptId, app);
+            const scriptFunction = await this.createScriptFunction(scriptContent, scriptId);
 
             // Cache the function
-            await loadLogger.withScope('💾 Cache Store', async (storeLogger) => {
-                this.scriptCache.set(cacheKey, scriptFunction);
-                storeLogger.debug('SCRIPT-LOADER', 'Community script cached');
-            });
+            await this.cacheScript(cacheKey, scriptFunction);
 
-            loadLogger.info('SCRIPT-LOADER', 'Community script loaded successfully');
+            emit('debug', 'SCRIPT-LOADER', 'Community script loaded successfully');
             return scriptFunction;
         }); // Auto-flush
     }
 
     /**
+     * 🔮 THE MAGIC: Check community script cache
+     */
+    private async checkCommunityCache(cacheKey: string): Promise<Function | null> {
+        return await withLogScope('💾 Cache Check', async () => {
+            if (this.scriptCache.has(cacheKey)) {
+                emit('debug', 'SCRIPT-LOADER', 'Cache hit');
+                return this.scriptCache.get(cacheKey)!;
+            }
+            emit('debug', 'SCRIPT-LOADER', 'Cache miss');
+            return null;
+        });
+    }
+
+    /**
+     * 🔮 THE MAGIC: Read community script from adapter
+     */
+    private async readCommunityScript(scriptId: string, app: App): Promise<string> {
+        return await withLogScope('📖 Read from Adapter', async () => {
+            const localPath = `community-scripts/${scriptId}.js`;
+            const adapter = app.vault.adapter;
+            const fullPath = `.obsidian/plugins/tagverse/${localPath}`;
+
+            try {
+                const content = await adapter.read(fullPath);
+                emit('debug', 'SCRIPT-LOADER', 'Community script file read', {
+                    fullPath,
+                    contentLength: content.length
+                });
+                return content;
+            } catch (error) {
+                emit('error', 'SCRIPT-LOADER', 'Failed to read community script file', {
+                    fullPath,
+                    error
+                });
+                throw new Error(`Failed to read community script file "${scriptId}": ${error.message}`);
+            }
+        });
+    }
+
+    /**
      * Clear the script cache
+     * 🔮 THE MAGIC: Even sync methods can use ambient context!
      */
     clearCache(): void {
-        createScopedLogger('🗑️ Clear Script Cache').execute((clearLogger) => {
+        withLogScope('🗑️ Clear Script Cache', () => {
             const previousSize = this.scriptCache.size;
             this.scriptCache.clear();
-            clearLogger.debug('CACHE', 'Script cache cleared', { previousSize });
+            emit('debug', 'CACHE', 'Script cache cleared', { previousSize });
         }); // Auto-flush (synchronous)
     }
 

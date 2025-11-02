@@ -1,7 +1,7 @@
 import { WidgetType, ViewPlugin } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
-import { ScopedLogger } from '../utils/logger';
+import { withLogScope, emit } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { TagRenderer } from './renderer';
@@ -29,16 +29,15 @@ export class LivePreviewRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         private frontmatter: any,
-        private args: any = {},
-        logger: ScopedLogger
+        private args: any = {}
     ) {
-        super(scriptLoader, app, tag, mapping, sourcePath, logger);
+        super(scriptLoader, app, tag, mapping, sourcePath);
 
         // Create container immediately
         this.container = createSpan({ cls: 'tagverse-widget-container' });
 
         // Create widget type wrapper
-        this._widgetType = new TagverseWidgetType(this, logger);
+        this._widgetType = new TagverseWidgetType(this);
 
         // Start async loading
         this.render(frontmatter, args);
@@ -72,40 +71,38 @@ export class LivePreviewRenderer extends TagRenderer {
         // Show loading state initially
         this.container!.textContent = `Loading #${this.tag}...`;
 
-        await this.logger.execute(async (rootLogger) => {
+        await withLogScope('🎨 Render Tag', async () => {
             try {
-                await rootLogger.withScope('🎨 Render Tag', async (renderLogger) => {
-                    // Execute script and get result (executeScript has its own nested scopes)
-                    const result = await this.executeScript(frontmatter, args);
+                // Execute script and get result (executeScript has its own nested scopes)
+                const result = await this.executeScript(frontmatter, args);
 
-                    // Process the result into an HTMLElement with nested scope
-                    const contentElement = await renderLogger.withScope('🔄 Process Result', async (processLogger) => {
-                        const element = this.processScriptResult(result);
-                        processLogger.debug('RENDER-PIPELINE', 'Script result processed into DOM element');
-                        return element;
-                    });
+                // Process the result into an HTMLElement with nested scope
+                const contentElement = await withLogScope('🔄 Process Result', async () => {
+                    const element = this.processScriptResult(result);
+                    emit('debug', 'RENDER-PIPELINE', 'Script result processed into DOM element');
+                    return element;
+                });
 
-                    // Update container with rendered content
-                    await renderLogger.withScope('🔄 Update Container', async (updateLogger) => {
-                        this.container!.innerHTML = '';
-                        this.container!.appendChild(contentElement);
-                        updateLogger.debug('RENDER-PIPELINE', 'Container updated with rendered content');
-                    });
+                // Update container with rendered content
+                await withLogScope('🔄 Update Container', async () => {
+                    this.container!.innerHTML = '';
+                    this.container!.appendChild(contentElement);
+                    emit('debug', 'RENDER-PIPELINE', 'Container updated with rendered content');
+                });
 
-                    // Mark rendering as successful
-                    renderLogger.info('RENDER-LIVE', 'Tag rendered successfully', {
-                        tag: this.tag
-                    });
+                // Mark rendering as successful
+                emit('debug', 'RENDER-LIVE', 'Tag rendered successfully', {
+                    tag: this.tag
                 });
             } catch (error) {
-                await rootLogger.withScope('❌ Handle Error', async (errorLogger) => {
+                await withLogScope('❌ Handle Error', async () => {
                     // Handle error
                     const errorEl = this.handleError(error as Error);
                     this.container!.innerHTML = '';
                     this.container!.appendChild(errorEl);
 
                     // Log error
-                    errorLogger.error('RENDER-LIVE', 'Tag rendering failed', error as Error);
+                    emit('error', 'RENDER-LIVE', 'Tag rendering failed', error as Error);
                 });
             }
         }); // Auto-flush
@@ -117,7 +114,7 @@ export class LivePreviewRenderer extends TagRenderer {
     protected processScriptResult(result: any): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan({ text: `#${this.tag}` });
-            this.logger.debug('RENDER-PIPELINE', 'Output fallback to plain tag', {
+            emit('debug', 'RENDER-PIPELINE', 'Output fallback to plain tag', {
                 tag: this.tag,
                 reason: 'null/undefined result'
             });
@@ -127,7 +124,7 @@ export class LivePreviewRenderer extends TagRenderer {
         if (typeof result === 'string') {
             const stringEl = createSpan();
             stringEl.innerHTML = result;
-            this.logger.debug('RENDER-PIPELINE', 'Output rendered as HTML string', {
+            emit('debug', 'RENDER-PIPELINE', 'Output rendered as HTML string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -136,7 +133,7 @@ export class LivePreviewRenderer extends TagRenderer {
 
         if (result instanceof HTMLElement) {
             // Return directly, styling handled in render method on container
-            this.logger.debug('RENDER-PIPELINE', 'Output rendered directly as HTMLElement', {
+            emit('debug', 'RENDER-PIPELINE', 'Output rendered directly as HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName
             });
@@ -148,7 +145,7 @@ export class LivePreviewRenderer extends TagRenderer {
             cls: 'tagverse-error',
             text: `[Invalid output for #${this.tag}]`
         });
-        this.logger.warn('RENDER-LIVE', 'Invalid output type', {
+        emit('warning', 'RENDER-LIVE', 'Invalid output type', {
             tag: this.tag,
             type: typeof result
         });
@@ -183,12 +180,11 @@ export class LivePreviewRenderer extends TagRenderer {
  */
 class TagverseWidgetType extends WidgetType {
     constructor(
-        private renderer: LivePreviewRenderer,
-        private logger: ScopedLogger
+        private renderer: LivePreviewRenderer
     ) {
         super();
 
-        this.logger.debug('WIDGET', 'Widget created', {
+        emit('debug', 'WIDGET', 'Widget created', {
             tag: renderer['tag'],
             script: renderer['mapping'].scriptPath,
             source: renderer['sourcePath']
@@ -201,7 +197,7 @@ class TagverseWidgetType extends WidgetType {
         const scriptEq = other.renderer['mapping'].scriptPath === this.renderer['mapping'].scriptPath;
         const result = tagEq && sourceEq && scriptEq;
 
-        this.logger.debug('WIDGET', 'Widget eq check', {
+        emit('debug', 'WIDGET', 'Widget eq check', {
             tag: this.renderer['tag'],
             tagEq,
             sourceEq,
@@ -215,7 +211,7 @@ class TagverseWidgetType extends WidgetType {
     }
 
     toDOM(): HTMLElement {
-        this.logger.debug('WIDGET', 'DOM requested', {
+        emit('debug', 'WIDGET', 'DOM requested', {
             tag: this.renderer['tag'],
             rendered: this.renderer['rendered']
         });

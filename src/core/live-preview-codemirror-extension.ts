@@ -8,7 +8,7 @@ import {
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
 import { StateField } from '@codemirror/state';
-import { createScopedLogger } from '../utils/logger';
+import { withLogScope, emit } from '../utils/logger';
 import { TagMatchingService, MatchContext } from '../services/tag-matching.service';
 import { TagMappingStateManager } from './live-preview-state';
 import { TagParser } from '../utils/tag-parser';
@@ -35,25 +35,21 @@ export class LivePreviewCodeMirrorExtension {
             private justInitialized = false;
 
             constructor(view: EditorView) {
-                createScopedLogger('🎨 ViewPlugin Constructor').execute((constructorLogger) => {
-                    constructorLogger.debug('VIEWPLUGIN', 'ViewPlugin created');
-                    // Defer initial decoration creation to first update to prevent duplicate processing
-                    this.decorations = Decoration.none;
-                }); // Auto-flush (synchronous)
+                emit('debug', 'VIEWPLUGIN', 'ViewPlugin created');
+                // Defer initial decoration creation to first update to prevent duplicate processing
+                this.decorations = Decoration.none;
             }
 
             update(update: ViewUpdate) {
                 // Handle initial decoration creation on first update
                 if (this.needsInitialUpdate) {
-                    createScopedLogger('🎨 Initial Decoration Build').execute((initialLogger) => {
-                        this.needsInitialUpdate = false;
-                        initialLogger.debug('VIEWPLUGIN', 'Initial update - creating decorations');
-                        this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
+                    this.needsInitialUpdate = false;
+                    emit('debug', 'VIEWPLUGIN', 'Initial update - creating decorations');
+                    this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
 
-                        // Debounce subsequent updates for 100ms to prevent rapid re-renders during initialization
-                        this.justInitialized = true;
-                        setTimeout(() => this.justInitialized = false, 100);
-                    }); // Auto-flush (synchronous)
+                    // Debounce subsequent updates for 100ms to prevent rapid re-renders during initialization
+                    this.justInitialized = true;
+                    setTimeout(() => this.justInitialized = false, 100);
                     return;
                 }
 
@@ -72,19 +68,17 @@ export class LivePreviewCodeMirrorExtension {
                 };
 
                 if (Object.values(reasons).some(Boolean)) {
-                    createScopedLogger('🎨 Update Decorations').execute((updateLogger) => {
-                        const reasonStr = Object.entries(reasons)
-                            .filter(([_, value]) => value)
-                            .map(([key]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
-                            .join(', ');
+                    const reasonStr = Object.entries(reasons)
+                        .filter(([_, value]) => value)
+                        .map(([key]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
+                        .join(', ');
 
-                        updateLogger.debug('VIEWPLUGIN', 'Rebuilding decorations', {
-                            reason: reasonStr,
-                            cursor: update.state.selection.main.head
-                        });
+                    emit('debug', 'VIEWPLUGIN', 'Rebuilding decorations', {
+                        reason: reasonStr,
+                        cursor: update.state.selection.main.head
+                    });
 
-                        this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
-                    }); // Auto-flush (synchronous)
+                    this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
                 }
             }
 
@@ -93,9 +87,7 @@ export class LivePreviewCodeMirrorExtension {
             }
 
             destroy() {
-                createScopedLogger('🗑️ ViewPlugin Destroy').execute((destroyLogger) => {
-                    destroyLogger.debug('VIEWPLUGIN', 'ViewPlugin destroyed');
-                }); // Auto-flush (synchronous)
+                emit('debug', 'VIEWPLUGIN', 'ViewPlugin destroyed');
             }
         }, {
             decorations: v => v.decorations

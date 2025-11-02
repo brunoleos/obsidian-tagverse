@@ -3,6 +3,7 @@ import TagversePlugin from '../core/plugin';
 import { TagverseSettings, TagScriptMapping } from '../types/interfaces';
 import { CommunityScriptsTab } from './community-scripts-tab';
 import { ScriptSubmissionModal } from './script-submission-modal';
+import { LogCategory } from 'src/utils/logger';
 
 export class TagverseSettingTab extends PluginSettingTab {
     plugin: TagversePlugin;
@@ -179,7 +180,7 @@ export class TagverseSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.logLevel)
                 .onChange(async (value) => {
                     const settings = this.plugin.settings;
-                    settings.logLevel = value as 'debug' | 'info' | 'warning' | 'error';
+                    settings.logLevel = value as LogCategory;
                     await this.plugin.saveSettings(settings);
                 })
             );

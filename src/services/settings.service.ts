@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { InstantLogger, LoggerFactory } from '../utils/logger';
+import { InstantLogger, LoggerFactory, LogCategory } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -34,8 +34,7 @@ export class SettingsService implements ISettingsService {
         await this.plugin.saveData(settings);
 
         // Update logger factory with new log level
-        const logLevel = settings.logLevel === 'warning' ? 'warn' : (settings.logLevel || 'debug');
-        this.loggerFactory.setLogLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
+        this.loggerFactory.setLogLevel(settings.logLevel || 'debug');
 
         this.logger.info('SETTINGS', 'Settings saved', {
             mappingCount: settings.tagMappings.length,
@@ -54,8 +53,7 @@ export class SettingsService implements ISettingsService {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 
         // Update logger factory with loaded log level
-        const logLevel = this.settings.logLevel === 'warning' ? 'warn' : (this.settings.logLevel || 'debug');
-        this.loggerFactory.setLogLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
+        this.loggerFactory.setLogLevel(this.settings.logLevel || 'debug');
 
         this.logger.info('SETTINGS', 'Settings loaded', {
             mappingCount: this.settings.tagMappings.length,

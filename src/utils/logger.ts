@@ -3,8 +3,7 @@ import { Notice } from 'obsidian';
 
 // ========== Types ==========
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type LogType = 'debug' | 'info' | 'warn' | 'error';
+export type LogCategory = 'debug' | 'info' | 'warning' | 'error';
 
 export interface LoggerOptions {
     showNoticeOnError?: boolean;
@@ -12,7 +11,7 @@ export interface LoggerOptions {
 }
 
 export interface LogEntry {
-    type: LogType;
+    type: LogCategory;
     component: string;
     event: string;
     data?: any;
@@ -28,13 +27,13 @@ export interface LogEntry {
 export class InstantLogger {
     constructor(
         private readonly prefix: string = '[TAGVERSE]',
-        private logLevel: LogLevel = 'debug',
+        private logLevel: LogCategory = 'debug',
         private options: LoggerOptions = {}
     ) {}
 
     // ========== Configuration ==========
 
-    setLogLevel(level: LogLevel): void {
+    setLogLevel(level: LogCategory): void {
         this.logLevel = level;
     }
 
@@ -57,8 +56,8 @@ export class InstantLogger {
     }
 
     warn(component: string, event: string, data?: any): void {
-        if (this.shouldLog('warn')) {
-            this.flushImmediate('warn', component, event, data);
+        if (this.shouldLog('warning')) {
+            this.flushImmediate('warning', component, event, data);
 
             if (this.options.showNoticeOnWarning) {
                 const userMessage = this.formatUserMessage(component, event);
@@ -82,19 +81,19 @@ export class InstantLogger {
 
     // ========== Private Methods ==========
 
-    private shouldLog(level: LogLevel): boolean {
-        const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+    private shouldLog(level: LogCategory): boolean {
+        const levels: LogCategory[] = ['debug', 'info', 'warning', 'error'];
         return levels.indexOf(level) >= levels.indexOf(this.logLevel);
     }
 
-    private flushImmediate(type: LogType, component: string, event: string, data?: any): void {
+    private flushImmediate(type: LogCategory, component: string, event: string, data?: any): void {
         const message = `${this.prefix} ${component} | ${event}`;
 
         switch (type) {
             case 'error':
                 console.error(message, data || '');
                 break;
-            case 'warn':
+            case 'warning':
                 console.warn(message, data || '');
                 break;
             case 'info':
@@ -148,7 +147,7 @@ export class LogScope {
     /**
      * Add a log entry to this scope
      */
-    addEntry(type: LogType, component: string, event: string, data?: any): void {
+    addEntry(type: LogCategory, component: string, event: string, data?: any): void {
         this.entries.push({
             type,
             component,
@@ -205,7 +204,7 @@ export class LogScope {
             case 'error':
                 console.error(message, data || '');
                 break;
-            case 'warn':
+            case 'warning':
                 console.warn(message, data || '');
                 break;
             case 'info':
@@ -240,7 +239,7 @@ export class ScopedLogger {
     }
 
     warn(component: string, event: string, data?: any): void {
-        this.scope.addEntry('warn', component, event, data);
+        this.scope.addEntry('warning', component, event, data);
     }
 
     error(component: string, event: string, error: Error | any): void {
@@ -299,7 +298,7 @@ export class LoggerFactory {
     private instantLogger: InstantLogger | null = null;
 
     constructor(
-        private logLevel: LogLevel = 'debug',
+        private logLevel: LogCategory = 'debug',
         private options: LoggerOptions = {}
     ) {}
 
@@ -324,7 +323,7 @@ export class LoggerFactory {
     /**
      * Update log level for future logger instances and existing instant logger
      */
-    setLogLevel(level: LogLevel): void {
+    setLogLevel(level: LogCategory): void {
         this.logLevel = level;
         if (this.instantLogger) {
             this.instantLogger.setLogLevel(level);

@@ -3,7 +3,7 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { LoggerFactory, ScopedLogger } from '../utils/logger';
+import { LoggerFactory, ScopedLogger, LogCategory } from '../utils/logger';
 import { LivePreviewRenderer } from './live-preview-renderer';
 import { ReadingModeRenderer } from './reading-mode-renderer';
 import { TagverseSettingTab } from '../settings/settings-tab';
@@ -67,8 +67,7 @@ export default class TagversePlugin extends Plugin {
             });
 
             // Update logger factory with settings
-            const logLevel = this.settings.logLevel === 'warning' ? 'warn' : (this.settings.logLevel || 'debug');
-            this.loggerFactory.setLogLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
+            this.loggerFactory.setLogLevel(this.settings.logLevel || 'debug');
 
             // Initialize community script service
             const communityLogger = this.loggerFactory.createScoped('Community Scripts');

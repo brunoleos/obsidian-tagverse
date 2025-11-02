@@ -1,5 +1,6 @@
 import { App } from 'obsidian';
 import { Notice } from 'obsidian';
+import { LogCategory } from 'src/utils/logger';
 
 export interface TagScriptMapping {
     tag: string;
@@ -72,7 +73,7 @@ export interface InstalledCommunityScript {
 export interface TagverseSettings {
     tagMappings: TagScriptMapping[];
     refreshOnFileChange: boolean;
-    logLevel: 'debug' | 'info' | 'warning' | 'error';
+    logLevel: LogCategory;
 
     // Community scripts settings
     installedCommunityScripts: InstalledCommunityScript[];

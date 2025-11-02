@@ -1,4 +1,4 @@
-import { InstantLogger } from './logger';
+import { logger } from './logger';
 import { REGEX_PATTERNS } from '../constants';
 
 export interface ParsedTag {
@@ -12,11 +12,6 @@ export interface ParsedTag {
  * Supports syntax like: #tagname{key: "value", array: [1,2,3]}
  */
 export class TagParser {
-    private static logger: InstantLogger;
-
-    static setLogger(logger: InstantLogger): void {
-        TagParser.logger = logger;
-    }
     /**
      * Parses a tag string that may contain arguments in {} braces
      * @param tagString - The full tag string (e.g., "#progress{value: 75}")
@@ -27,7 +22,7 @@ export class TagParser {
         const match = tagString.match(/^#([a-zA-Z0-9_-]+)(\{[\s\S]*\})?$/);
 
         if (!match) {
-            TagParser.logger?.debug('TAG_PARSER', 'Invalid tag format', { tagString });
+            logger.debug('TAG_PARSER', 'Invalid tag format', { tagString });
             return {
                 tag: tagString.replace(/^#/, ''),
                 args: {},
@@ -79,14 +74,14 @@ export class TagParser {
             // Parse as JSON
             const parsed = JSON.parse(`{${content}}`);
 
-            TagParser.logger?.debug('TAG_PARSER', 'Successfully parsed arguments', {
+            logger.debug('TAG_PARSER', 'Successfully parsed arguments', {
                 original: argsString,
                 parsed
             });
 
             return parsed;
         } catch (error) {
-            TagParser.logger?.debug('TAG_PARSER', 'Failed to parse arguments, returning empty object', {
+            logger.debug('TAG_PARSER', 'Failed to parse arguments, returning empty object', {
                 argsString,
                 error: error.message
             });

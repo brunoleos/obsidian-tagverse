@@ -283,10 +283,7 @@ export class ScopedLogger {
  * Inject this into classes that need to create operation-specific loggers.
  */
 export class LoggerFactory {
-    private instantLogger: InstantLogger | null = null;
-
     constructor(
-        private logLevel: LogCategory = 'debug',
         private options: LoggerOptions = {}
     ) {}
 
@@ -299,23 +296,10 @@ export class LoggerFactory {
     }
 
     /**
-     * Create an instant logger for immediate console output (singleton)
-     */
-    createInstant(): InstantLogger {
-        if (!this.instantLogger) {
-            this.instantLogger = new InstantLogger('[TAGVERSE]', this.logLevel, this.options);
-        }
-        return this.instantLogger;
-    }
-
-    /**
      * Update log level for future logger instances and existing instant logger
      */
     setLogLevel(level: LogCategory): void {
-        this.logLevel = level;
-        if (this.instantLogger) {
-            this.instantLogger.setLogLevel(level);
-        }
+        logger.setLogLevel(level);
     }
 
     /**
@@ -323,10 +307,19 @@ export class LoggerFactory {
      */
     setOptions(options: LoggerOptions): void {
         this.options = { ...this.options, ...options };
-        if (this.instantLogger) {
-            this.instantLogger.setOptions(options);
-        }
+        logger.setOptions(options);
     }
 }
+
+// ========== Default Logger Instance ==========
+
+/**
+ * Default logger instance for direct import and use.
+ * Eliminates need for dependency injection in simple cases.
+ */
+export const logger = new InstantLogger('[TAGVERSE]', 'debug', {
+    showNoticeOnError: true,
+    showNoticeOnWarning: false
+});
 
 // ========================================

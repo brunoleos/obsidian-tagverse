@@ -42,7 +42,7 @@ export default class TagversePlugin extends Plugin {
 
     async onload() {
         // Create logger factory first
-        this.loggerFactory = new LoggerFactory('debug', {
+        this.loggerFactory = new LoggerFactory({
             showNoticeOnError: true,
             showNoticeOnWarning: false
         });
@@ -114,8 +114,7 @@ export default class TagversePlugin extends Plugin {
                 LivePreviewRenderer.registerLivePreviewExtension(
                     this.app,
                     this.tagMapping,
-                    this.rendererFactory,
-                    this.loggerFactory
+                    this.rendererFactory
                 )
             );
             initLogger.info('PLUGIN-INIT', 'Live preview processor registered');
@@ -181,16 +180,12 @@ export default class TagversePlugin extends Plugin {
      */
     private initializeServices(): void {
         // Create logger instances for services
-        const instantLogger = this.loggerFactory.createInstant();
         const tagMappingLogger = this.loggerFactory.createScoped('Tag Mapping');
 
-        // Setup static logger for TagParser
-        TagParser.setLogger(instantLogger);
-
         // Create service instances
-        this.scriptLoader = new ScriptLoaderService(instantLogger);
+        this.scriptLoader = new ScriptLoaderService();
         this.tagMapping = new TagMappingService(tagMappingLogger);
-        this.settingsService = new SettingsService(this, instantLogger, this.loggerFactory);
+        this.settingsService = new SettingsService(this, this.loggerFactory);
         this.rendererFactory = new RendererFactoryService(
             this.scriptLoader,
             this.app,

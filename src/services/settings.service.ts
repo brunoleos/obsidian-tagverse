@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { InstantLogger, LoggerFactory, LogCategory } from '../utils/logger';
+import { logger, LoggerFactory, LogCategory } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -13,7 +13,6 @@ export class SettingsService implements ISettingsService {
 
     constructor(
         private plugin: Plugin,
-        private logger: InstantLogger,
         private loggerFactory: LoggerFactory
     ) {
         this.settings = { ...DEFAULT_SETTINGS };
@@ -36,7 +35,7 @@ export class SettingsService implements ISettingsService {
         // Update logger factory with new log level
         this.loggerFactory.setLogLevel(settings.logLevel || 'debug');
 
-        this.logger.info('SETTINGS', 'Settings saved', {
+        logger.info('SETTINGS', 'Settings saved', {
             mappingCount: settings.tagMappings.length,
             logLevel: settings.logLevel
         });
@@ -55,14 +54,14 @@ export class SettingsService implements ISettingsService {
         // Update logger factory with loaded log level
         this.loggerFactory.setLogLevel(this.settings.logLevel || 'debug');
 
-        this.logger.info('SETTINGS', 'Settings loaded', {
+        logger.info('SETTINGS', 'Settings loaded', {
             mappingCount: this.settings.tagMappings.length,
             refreshOnFileChange: this.settings.refreshOnFileChange,
             logLevel: this.settings.logLevel
         });
 
         this.settings.tagMappings.forEach((m, i) => {
-            this.logger.debug('SETTINGS', 'Mapping configured', {
+            logger.debug('SETTINGS', 'Mapping configured', {
                 index: i,
                 tag: m.tag,
                 script: m.scriptPath,
@@ -86,7 +85,7 @@ export class SettingsService implements ISettingsService {
             try {
                 callback(this.settings);
             } catch (error) {
-                this.logger.error('ERROR-HANDLING', 'Settings change callback failed', error as Error);
+                logger.error('ERROR-HANDLING', 'Settings change callback failed', error as Error);
             }
         });
     }

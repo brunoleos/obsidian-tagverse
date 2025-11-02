@@ -1,7 +1,7 @@
 import { WidgetType, ViewPlugin } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
-import { ScopedLogger, LoggerFactory } from '../utils/logger';
+import { ScopedLogger } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { TagRenderer } from './renderer';
@@ -152,11 +152,9 @@ export class LivePreviewRenderer extends TagRenderer {
         app: App,
         tagMapping: ITagMappingProvider,
         rendererFactory: RendererFactoryService,
-        loggerFactory: LoggerFactory
     ): [ViewPlugin<any>, StateField<number>] {
-        const instantLogger = loggerFactory.createInstant();
-        const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app, instantLogger);
-        const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app, instantLogger);
+        const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app);
+        const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app);
         return extension.createExtension();
     }
 

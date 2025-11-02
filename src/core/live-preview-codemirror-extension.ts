@@ -8,7 +8,7 @@ import {
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
 import { StateField } from '@codemirror/state';
-import { InstantLogger } from '../utils/logger';
+import { logger } from '../utils/logger';
 import { TagMatchingService, MatchContext } from '../services/tag-matching.service';
 import { TagMappingStateManager } from './live-preview-state';
 import { TagParser } from '../utils/tag-parser';
@@ -20,8 +20,7 @@ import { REGEX_PATTERNS } from '../constants';
 export class LivePreviewCodeMirrorExtension {
     constructor(
         private tagMatchingService: TagMatchingService,
-        private app: App,
-        private logger: InstantLogger
+        private app: App
     ) {}
 
     /**
@@ -29,7 +28,6 @@ export class LivePreviewCodeMirrorExtension {
      */
     createExtension(): [ViewPlugin<any>, any] {
         const matchDecorator = this.createMatchDecorator();
-        const logger = this.logger; // Capture logger in closure
 
         const livePreviewPlugin = ViewPlugin.fromClass(class {
             decorations: DecorationSet;
@@ -106,7 +104,6 @@ export class LivePreviewCodeMirrorExtension {
      * Supports both #tag and #tag{args} syntax
      */
     private createMatchDecorator(): MatchDecorator {
-        const logger = this.logger; // Capture logger
         return new MatchDecorator({
             regexp: REGEX_PATTERNS.TAG_ARGUMENT,
             decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {

@@ -41,25 +41,24 @@ export class ReadingModeRenderer extends TagRenderer {
      * Render the tag in reading mode by replacing the target element and cleaning up arguments text
      */
     async render(frontmatter: any): Promise<void> {
-        try {
-            await this.logger.withScope('🎨 Render Tag', async (renderLogger) => {
-                await this.renderSuccessfully(frontmatter, renderLogger);
-                this.rendered = true;
+        await this.logger.execute(async (rootLogger) => {
+            try {
+                await rootLogger.withScope('🎨 Render Tag', async (renderLogger) => {
+                    await this.renderSuccessfully(frontmatter, renderLogger);
+                    this.rendered = true;
 
-                // Mark rendering as successful
-                renderLogger.info('RENDER-READING', 'Tag rendered successfully', {
-                    tag: this.tag
+                    // Mark rendering as successful
+                    renderLogger.info('RENDER-READING', 'Tag rendered successfully', {
+                        tag: this.tag
+                    });
                 });
-            });
-        } catch (error) {
-            await this.logger.withScope('❌ Handle Error', async (errorLogger) => {
-                this.handleRenderError(error);
-                errorLogger.error('RENDER-READING', 'Tag rendering failed', error as Error);
-            });
-        } finally {
-            // Auto-flush happens since this is root scope
-            this.logger.flush();
-        }
+            } catch (error) {
+                await rootLogger.withScope('❌ Handle Error', async (errorLogger) => {
+                    this.handleRenderError(error);
+                    errorLogger.error('RENDER-READING', 'Tag rendering failed', error as Error);
+                });
+            }
+        }); // Auto-flush
     }
 
     /**

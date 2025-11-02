@@ -277,29 +277,40 @@ export class ScopedLogger {
     }
 
     /**
+     * Execute a function with this logger as the root scope.
+     * Auto-flushes when the function completes (root scope completes).
+     * Works with both synchronous and asynchronous functions.
+     * This is the primary way to use a ScopedLogger.
+     */
+    execute<T>(
+        fn: (logger: ScopedLogger) => T | Promise<T>
+    ): T | Promise<T> {
+        try {
+            return fn(this);
+        } finally {
+            // Auto-flush only if this is a root scope
+            if (!this.scope.parent) {
+                this.flush();
+            }
+        }
+    }
+
+    /**
      * Execute a function with a nested scope.
-     * Auto-flushes if this is the root scope.
+     * Does NOT auto-flush - used for creating child scopes only.
      */
     async withScope<T>(
         label: string,
         fn: (logger: ScopedLogger) => T | Promise<T>
     ): Promise<T> {
         const nestedLogger = this.createNested(label);
-
-        try {
-            return await fn(nestedLogger);
-        } finally {
-            // Auto-flush only if root scope (no parent)
-            if (!this.scope.parent) {
-                this.scope.flush();
-            }
-        }
+        return await fn(nestedLogger);
     }
 
     /**
-     * Manually flush this logger's scope (only for root loggers)
+     * Flush this logger's scope (private - only called by execute())
      */
-    flush(): void {
+    private flush(): void {
         if (!this.scope.parent) {
             this.scope.flush();
         }

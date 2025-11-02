@@ -8,9 +8,7 @@ export class ScriptLoaderService implements IScriptLoader {
     constructor() {}
 
     async loadScript(scriptPath: string, app: App): Promise<Function> {
-        const loadLogger = createScopedLogger(`📜 Load Script: ${scriptPath}`);
-
-        try {
+        return await createScopedLogger(`📜 Load Script: ${scriptPath}`).execute(async (loadLogger) => {
             // Handle community scripts
             if (scriptPath.startsWith('community:')) {
                 return this.loadCommunityScript(scriptPath, app);
@@ -93,12 +91,7 @@ export class ScriptLoaderService implements IScriptLoader {
 
             loadLogger.info('SCRIPT-LOADER', 'Script loaded successfully');
             return scriptFunction;
-        } catch (error) {
-            loadLogger.error('SCRIPT-LOADER', 'Script loading failed', { error });
-            throw error;
-        } finally {
-            loadLogger.flush();
-        }
+        }); // Auto-flush
     }
 
     /**
@@ -107,9 +100,8 @@ export class ScriptLoaderService implements IScriptLoader {
     private async loadCommunityScript(scriptPath: string, app: App): Promise<Function> {
         const scriptId = scriptPath.replace('community:', '');
         const cacheKey = `community:${scriptId}`;
-        const loadLogger = createScopedLogger(`📦 Load Community Script: ${scriptId}`);
 
-        try {
+        return await createScopedLogger(`📦 Load Community Script: ${scriptId}`).execute(async (loadLogger) => {
             // Check cache
             const cachedScript = await loadLogger.withScope('💾 Cache Check', async (cacheLogger) => {
                 if (this.scriptCache.has(cacheKey)) {
@@ -180,27 +172,18 @@ export class ScriptLoaderService implements IScriptLoader {
 
             loadLogger.info('SCRIPT-LOADER', 'Community script loaded successfully');
             return scriptFunction;
-        } catch (error) {
-            loadLogger.error('SCRIPT-LOADER', 'Failed to load community script', { error });
-            throw error;
-        } finally {
-            loadLogger.flush();
-        }
+        }); // Auto-flush
     }
 
     /**
      * Clear the script cache
      */
     clearCache(): void {
-        const clearLogger = createScopedLogger('🗑️ Clear Script Cache');
-
-        try {
+        createScopedLogger('🗑️ Clear Script Cache').execute((clearLogger) => {
             const previousSize = this.scriptCache.size;
             this.scriptCache.clear();
             clearLogger.debug('CACHE', 'Script cache cleared', { previousSize });
-        } finally {
-            clearLogger.flush();
-        }
+        }); // Auto-flush (synchronous)
     }
 
     /**

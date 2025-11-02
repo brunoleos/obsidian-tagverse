@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { createScopedLogger, setDefaultLogLevel, setDefaultLoggerOptions, LogCategory } from '../utils/logger';
+import { createScopedLogger, logger, setDefaultLogLevel, setDefaultLoggerOptions, LogCategory } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -26,9 +26,7 @@ export class SettingsService implements ISettingsService {
      * Save settings
      */
     async saveSettings(settings: TagverseSettings): Promise<void> {
-        const saveLogger = createScopedLogger('⚙️ Save Settings');
-
-        try {
+        await createScopedLogger('⚙️ Save Settings').execute(async (saveLogger) => {
             this.settings = settings;
 
             await saveLogger.withScope('💾 Write to Disk', async (diskLogger) => {
@@ -53,18 +51,14 @@ export class SettingsService implements ISettingsService {
                 this.notifyCallbacks();
                 callbackLogger.info('SETTINGS', `Notified ${this.changeCallbacks.length} callback(s)`);
             });
-        } finally {
-            saveLogger.flush();
-        }
+        }); // Auto-flush
     }
 
     /**
      * Load settings from storage
      */
     async loadSettings(): Promise<void> {
-        const loadLogger = createScopedLogger('⚙️ Load Settings');
-
-        try {
+        await createScopedLogger('⚙️ Load Settings').execute(async (loadLogger) => {
             await loadLogger.withScope('📖 Read from Disk', async (diskLogger) => {
                 const loadedData = await this.plugin.loadData();
                 this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
@@ -95,9 +89,7 @@ export class SettingsService implements ISettingsService {
                 });
                 mappingLogger.info('SETTINGS', `Logged ${this.settings.tagMappings.length} mapping(s)`);
             });
-        } finally {
-            loadLogger.flush();
-        }
+        }); // Auto-flush
     }
 
     /**
@@ -111,18 +103,14 @@ export class SettingsService implements ISettingsService {
      * Notify all registered callbacks of settings changes
      */
     private notifyCallbacks(): void {
-        const notifyLogger = createScopedLogger('📢 Callback Notification');
-
-        try {
-            this.changeCallbacks.forEach((callback, index) => {
-                try {
-                    callback(this.settings);
-                } catch (error) {
-                    notifyLogger.error('ERROR-HANDLING', `Callback ${index} failed`, error as Error);
-                }
-            });
-        } finally {
-            notifyLogger.flush();
-        }
+        // Note: This is called from within saveSettings scope, so we don't create a new root scope
+        this.changeCallbacks.forEach((callback, index) => {
+            try {
+                callback(this.settings);
+            } catch (error) {
+                // Use InstantLogger for synchronous error logging
+                logger.error('ERROR-HANDLING', `Settings change callback ${index} failed`, error as Error);
+            }
+        });
     }
 }

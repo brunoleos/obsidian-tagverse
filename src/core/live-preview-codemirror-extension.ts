@@ -35,21 +35,17 @@ export class LivePreviewCodeMirrorExtension {
             private justInitialized = false;
 
             constructor(view: EditorView) {
-                const constructorLogger = createScopedLogger('🎨 ViewPlugin Constructor');
-                try {
+                createScopedLogger('🎨 ViewPlugin Constructor').execute((constructorLogger) => {
                     constructorLogger.debug('VIEWPLUGIN', 'ViewPlugin created');
                     // Defer initial decoration creation to first update to prevent duplicate processing
                     this.decorations = Decoration.none;
-                } finally {
-                    constructorLogger.flush();
-                }
+                }); // Auto-flush (synchronous)
             }
 
             update(update: ViewUpdate) {
                 // Handle initial decoration creation on first update
                 if (this.needsInitialUpdate) {
-                    const initialLogger = createScopedLogger('🎨 Initial Decoration Build');
-                    try {
+                    createScopedLogger('🎨 Initial Decoration Build').execute((initialLogger) => {
                         this.needsInitialUpdate = false;
                         initialLogger.debug('VIEWPLUGIN', 'Initial update - creating decorations');
                         this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
@@ -57,9 +53,7 @@ export class LivePreviewCodeMirrorExtension {
                         // Debounce subsequent updates for 100ms to prevent rapid re-renders during initialization
                         this.justInitialized = true;
                         setTimeout(() => this.justInitialized = false, 100);
-                    } finally {
-                        initialLogger.flush();
-                    }
+                    }); // Auto-flush (synchronous)
                     return;
                 }
 
@@ -78,8 +72,7 @@ export class LivePreviewCodeMirrorExtension {
                 };
 
                 if (Object.values(reasons).some(Boolean)) {
-                    const updateLogger = createScopedLogger('🎨 Update Decorations');
-                    try {
+                    createScopedLogger('🎨 Update Decorations').execute((updateLogger) => {
                         const reasonStr = Object.entries(reasons)
                             .filter(([_, value]) => value)
                             .map(([key]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
@@ -91,9 +84,7 @@ export class LivePreviewCodeMirrorExtension {
                         });
 
                         this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
-                    } finally {
-                        updateLogger.flush();
-                    }
+                    }); // Auto-flush (synchronous)
                 }
             }
 
@@ -102,12 +93,9 @@ export class LivePreviewCodeMirrorExtension {
             }
 
             destroy() {
-                const destroyLogger = createScopedLogger('🗑️ ViewPlugin Destroy');
-                try {
+                createScopedLogger('🗑️ ViewPlugin Destroy').execute((destroyLogger) => {
                     destroyLogger.debug('VIEWPLUGIN', 'ViewPlugin destroyed');
-                } finally {
-                    destroyLogger.flush();
-                }
+                }); // Auto-flush (synchronous)
             }
         }, {
             decorations: v => v.decorations

@@ -72,44 +72,43 @@ export class LivePreviewRenderer extends TagRenderer {
         // Show loading state initially
         this.container!.textContent = `Loading #${this.tag}...`;
 
-        try {
-            await this.logger.withScope('🎨 Render Tag', async (renderLogger) => {
-                // Execute script and get result (executeScript has its own nested scopes)
-                const result = await this.executeScript(frontmatter, args);
+        await this.logger.execute(async (rootLogger) => {
+            try {
+                await rootLogger.withScope('🎨 Render Tag', async (renderLogger) => {
+                    // Execute script and get result (executeScript has its own nested scopes)
+                    const result = await this.executeScript(frontmatter, args);
 
-                // Process the result into an HTMLElement with nested scope
-                const contentElement = await renderLogger.withScope('🔄 Process Result', async (processLogger) => {
-                    const element = this.processScriptResult(result);
-                    processLogger.debug('RENDER-PIPELINE', 'Script result processed into DOM element');
-                    return element;
+                    // Process the result into an HTMLElement with nested scope
+                    const contentElement = await renderLogger.withScope('🔄 Process Result', async (processLogger) => {
+                        const element = this.processScriptResult(result);
+                        processLogger.debug('RENDER-PIPELINE', 'Script result processed into DOM element');
+                        return element;
+                    });
+
+                    // Update container with rendered content
+                    await renderLogger.withScope('🔄 Update Container', async (updateLogger) => {
+                        this.container!.innerHTML = '';
+                        this.container!.appendChild(contentElement);
+                        updateLogger.debug('RENDER-PIPELINE', 'Container updated with rendered content');
+                    });
+
+                    // Mark rendering as successful
+                    renderLogger.info('RENDER-LIVE', 'Tag rendered successfully', {
+                        tag: this.tag
+                    });
                 });
-
-                // Update container with rendered content
-                await renderLogger.withScope('🔄 Update Container', async (updateLogger) => {
+            } catch (error) {
+                await rootLogger.withScope('❌ Handle Error', async (errorLogger) => {
+                    // Handle error
+                    const errorEl = this.handleError(error as Error);
                     this.container!.innerHTML = '';
-                    this.container!.appendChild(contentElement);
-                    updateLogger.debug('RENDER-PIPELINE', 'Container updated with rendered content');
-                });
+                    this.container!.appendChild(errorEl);
 
-                // Mark rendering as successful
-                renderLogger.info('RENDER-LIVE', 'Tag rendered successfully', {
-                    tag: this.tag
+                    // Log error
+                    errorLogger.error('RENDER-LIVE', 'Tag rendering failed', error as Error);
                 });
-            });
-        } catch (error) {
-            await this.logger.withScope('❌ Handle Error', async (errorLogger) => {
-                // Handle error
-                const errorEl = this.handleError(error as Error);
-                this.container!.innerHTML = '';
-                this.container!.appendChild(errorEl);
-
-                // Log error
-                errorLogger.error('RENDER-LIVE', 'Tag rendering failed', error as Error);
-            });
-        } finally {
-            // Auto-flush root scope
-            this.logger.flush();
-        }
+            }
+        }); // Auto-flush
     }
 
     /**

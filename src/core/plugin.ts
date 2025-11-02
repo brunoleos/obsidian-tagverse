@@ -40,10 +40,8 @@ export default class TagversePlugin extends Plugin {
     }
 
     async onload() {
-        // Create scoped logger for initialization
-        const initLogger = createScopedLogger('🚀 Plugin Initialization');
-
-        try {
+        // Execute plugin initialization with auto-flush
+        await createScopedLogger('🚀 Plugin Initialization').execute(async (initLogger) => {
             initLogger.info('PLUGIN-INIT', 'Plugin initialization started');
 
             TagversePluginInstance = this;
@@ -165,13 +163,7 @@ export default class TagversePlugin extends Plugin {
             });
 
             initLogger.info('PLUGIN-INIT', 'Plugin loaded successfully');
-        } catch (error) {
-            initLogger.error('PLUGIN-INIT', 'Plugin initialization failed', error as Error);
-            throw error;
-        } finally {
-            // Flush initialization logs
-            initLogger.flush();
-        }
+        }); // Auto-flushes here
     }
 
     onunload() {

@@ -31,7 +31,10 @@ export class SettingsService implements ISettingsService {
 
             await withLogScope('💾 Write to Disk', async () => {
                 await this.plugin.saveData(settings);
-                emit('debug', 'SETTINGS', 'Settings written to disk');
+                emit('debug', 'SETTINGS', 'Settings written to disk', {
+                    mappingCount: settings.tagMappings.length,
+                    logLevel: settings.logLevel
+                });
             });
 
             await withLogScope('🔧 Update Log Level', async () => {
@@ -62,7 +65,10 @@ export class SettingsService implements ISettingsService {
             await withLogScope('📖 Read from Disk', async () => {
                 const loadedData = await this.plugin.loadData();
                 this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-                emit('debug', 'SETTINGS', 'Settings read from disk');
+                emit('debug', 'SETTINGS', 'Settings read from disk', {
+                    hasData: !!loadedData,
+                    mappingCount: loadedData?.tagMappings?.length || 0
+                });
             });
 
             await withLogScope('🔧 Update Log Level', async () => {

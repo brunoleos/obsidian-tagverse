@@ -28,6 +28,7 @@ export class LivePreviewCodeMirrorExtension {
      */
     createExtension(): [ViewPlugin<any>, any] {
         const matchDecorator = this.createMatchDecorator();
+        const app = this.app;
 
         const livePreviewPlugin = ViewPlugin.fromClass(class {
             decorations: DecorationSet;
@@ -35,7 +36,10 @@ export class LivePreviewCodeMirrorExtension {
             private justInitialized = false;
 
             constructor(view: EditorView) {
-                emit('debug', 'VIEWPLUGIN', 'ViewPlugin created');
+                const file = app.workspace.getActiveFile();
+                emit('debug', 'VIEWPLUGIN', 'ViewPlugin created', {
+                    filePath: file?.path || 'unknown'
+                });
                 // Defer initial decoration creation to first update to prevent duplicate processing
                 this.decorations = Decoration.none;
             }
@@ -44,7 +48,11 @@ export class LivePreviewCodeMirrorExtension {
                 // Handle initial decoration creation on first update
                 if (this.needsInitialUpdate) {
                     this.needsInitialUpdate = false;
-                    emit('debug', 'VIEWPLUGIN', 'Initial update - creating decorations');
+                    const file = app.workspace.getActiveFile();
+                    emit('debug', 'VIEWPLUGIN', 'Initial update - creating decorations', {
+                        filePath: file?.path || 'unknown',
+                        docLength: update.view.state.doc.length
+                    });
                     this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
 
                     // Debounce subsequent updates for 100ms to prevent rapid re-renders during initialization
@@ -87,7 +95,10 @@ export class LivePreviewCodeMirrorExtension {
             }
 
             destroy() {
-                emit('debug', 'VIEWPLUGIN', 'ViewPlugin destroyed');
+                const file = app.workspace.getActiveFile();
+                emit('debug', 'VIEWPLUGIN', 'ViewPlugin destroyed', {
+                    filePath: file?.path || 'unknown'
+                });
             }
         }, {
             decorations: v => v.decorations

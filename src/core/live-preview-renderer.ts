@@ -79,7 +79,10 @@ export class LivePreviewRenderer extends TagRenderer {
                 // Process the result into an HTMLElement with nested scope
                 const contentElement = await withLogScope('🔄 Process Result', async () => {
                     const element = this.processScriptResult(result);
-                    emit('debug', 'RENDER-PIPELINE', 'Script result processed into DOM element');
+                    emit('debug', 'RENDER-PIPELINE', 'Script result processed into DOM element', {
+                        tag: this.tag,
+                        resultType: typeof result
+                    });
                     return element;
                 });
 
@@ -87,7 +90,9 @@ export class LivePreviewRenderer extends TagRenderer {
                 await withLogScope('🔄 Update Container', async () => {
                     this.container!.innerHTML = '';
                     this.container!.appendChild(contentElement);
-                    emit('debug', 'RENDER-PIPELINE', 'Container updated with rendered content');
+                    emit('debug', 'RENDER-PIPELINE', 'Container updated with rendered content', {
+                        tag: this.tag
+                    });
                 });
 
                 // Mark rendering as successful

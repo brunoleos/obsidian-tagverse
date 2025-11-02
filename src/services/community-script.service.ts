@@ -43,7 +43,10 @@ export class CommunityScriptService implements ICommunityScriptService {
                     });
                     return this.cachedRegistry;
                 }
-                emit('debug', 'COMMUNITY', 'Cache miss or expired');
+                emit('debug', 'COMMUNITY', 'Cache miss or expired', {
+                    cacheAge: now - settings.lastRegistryFetch,
+                    cacheDuration: this.CACHE_DURATION
+                });
                 return null;
             });
 
@@ -54,7 +57,9 @@ export class CommunityScriptService implements ICommunityScriptService {
             // Download from network
             try {
                 await withLogScope('🌐 Network Request', async () => {
-                    emit('debug', 'COMMUNITY', 'Fetching registry from GitHub');
+                    emit('debug', 'COMMUNITY', 'Fetching registry from GitHub', {
+                        url: settings.communityRegistryUrl
+                    });
                     const response = await requestUrl({
                         url: settings.communityRegistryUrl,
                         method: 'GET'
@@ -70,10 +75,14 @@ export class CommunityScriptService implements ICommunityScriptService {
                 await withLogScope('⚙️ Update Settings', async () => {
                     settings.lastRegistryFetch = now;
                     await this.saveSettings(settings);
-                    emit('debug', 'COMMUNITY', 'Cache timestamp updated');
+                    emit('debug', 'COMMUNITY', 'Cache timestamp updated', {
+                        timestamp: now
+                    });
                 });
 
-                emit('debug', 'COMMUNITY', 'Registry fetched successfully');
+                emit('debug', 'COMMUNITY', 'Registry fetched successfully', {
+                    totalScripts: this.cachedRegistry!.totalScripts
+                });
                 return this.cachedRegistry!;
             } catch (error) {
                 emit('error', 'COMMUNITY', 'Failed to fetch registry', error as Error);
@@ -150,17 +159,17 @@ export class CommunityScriptService implements ICommunityScriptService {
                     emit('error', 'COMMUNITY', 'Script already installed', { scriptId });
                     throw new Error(`Script "${scriptId}" is already installed`);
                 }
-                emit('debug', 'COMMUNITY', 'Validation passed');
+                emit('debug', 'COMMUNITY', 'Validation passed', { scriptId });
             });
 
             emit('debug', 'COMMUNITY', 'Starting script installation', { scriptId });
 
             // Download phase
             const { scriptCode, scriptMeta } = await withLogScope('⬇️ Download', async () => {
-                emit('debug', 'COMMUNITY', 'Downloading script code');
+                emit('debug', 'COMMUNITY', 'Downloading script code', { scriptId });
                 const code = await this.downloadScript(scriptId);
 
-                emit('debug', 'COMMUNITY', 'Fetching metadata');
+                emit('debug', 'COMMUNITY', 'Fetching metadata', { scriptId });
                 const registry = await this.fetchRegistry();
                 const meta = registry.scripts.find(s => s.id === scriptId);
                 if (!meta) {
@@ -218,7 +227,10 @@ export class CommunityScriptService implements ICommunityScriptService {
                     });
 
                     await this.saveSettings(settings);
-                    emit('debug', 'COMMUNITY', 'Installation tracked in settings');
+                    emit('debug', 'COMMUNITY', 'Installation tracked in settings', {
+                        scriptId,
+                        version: scriptMeta.version
+                    });
                 });
             });
 
@@ -321,10 +333,10 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             // Download phase
             const { scriptCode, scriptMeta } = await withLogScope('⬇️ Download Latest', async () => {
-                emit('debug', 'COMMUNITY', 'Downloading latest script version');
+                emit('debug', 'COMMUNITY', 'Downloading latest script version', { scriptId });
                 const code = await this.downloadScript(scriptId);
 
-                emit('debug', 'COMMUNITY', 'Fetching latest metadata');
+                emit('debug', 'COMMUNITY', 'Fetching latest metadata', { scriptId });
                 const registry = await this.fetchRegistry();
                 const meta = registry.scripts.find(s => s.id === scriptId);
                 if (!meta) {

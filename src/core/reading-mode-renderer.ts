@@ -69,7 +69,10 @@ export class ReadingModeRenderer extends TagRenderer {
         // Process the result with nested scope
         const contentElement = await withLogScope('🔄 Process Result', async () => {
             const element = this.processScriptResult(result);
-            emit('debug', 'RENDER-PIPELINE', 'Script result processed into DOM element');
+            emit('debug', 'RENDER-PIPELINE', 'Script result processed into DOM element', {
+                tag: this.tag,
+                resultType: typeof result
+            });
             return element;
         });
 
@@ -78,12 +81,17 @@ export class ReadingModeRenderer extends TagRenderer {
             const wrapper = createSpan();
             wrapper.appendChild(contentElement);
             this.targetElement.replaceWith(wrapper);
-            emit('debug', 'RENDER-PIPELINE', 'Tag element replaced with rendered content');
+            emit('debug', 'RENDER-PIPELINE', 'Tag element replaced with rendered content', {
+                tag: this.tag
+            });
 
             // Clean up any arguments text (search next to wrapper now in DOM)
             await withLogScope('🧹 Args Cleanup', async () => {
                 this.performArgsCleanup(wrapper);
-                emit('debug', 'RENDER-PIPELINE', 'Arguments text cleaned up');
+                emit('debug', 'RENDER-PIPELINE', 'Arguments text cleaned up', {
+                    tag: this.tag,
+                    hasArgs: Object.keys(this.args).length > 0
+                });
             });
         });
     }

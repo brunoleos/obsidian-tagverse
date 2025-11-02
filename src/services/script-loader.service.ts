@@ -29,7 +29,9 @@ export class ScriptLoaderService implements IScriptLoader {
             // 🔮 Cache the result
             await this.cacheScript(scriptPath, scriptFunction);
 
-            emit('debug', 'SCRIPT-LOADER', 'Script loaded successfully');
+            emit('debug', 'SCRIPT-LOADER', 'Script loaded successfully', {
+                scriptPath
+            });
             return scriptFunction;
         }); // Auto-flush
     }
@@ -41,10 +43,10 @@ export class ScriptLoaderService implements IScriptLoader {
     private async checkCache(scriptPath: string): Promise<Function | null> {
         return await withLogScope('💾 Cache Check', async () => {
             if (this.scriptCache.has(scriptPath)) {
-                emit('debug', 'CACHE', 'Cache hit');
+                emit('debug', 'CACHE', 'Cache hit', { scriptPath });
                 return this.scriptCache.get(scriptPath)!;
             }
-            emit('debug', 'CACHE', 'Cache miss');
+            emit('debug', 'CACHE', 'Cache miss', { scriptPath });
             return null;
         });
     }
@@ -64,7 +66,7 @@ export class ScriptLoaderService implements IScriptLoader {
                 throw new Error(`Script file not found or not a file: ${scriptPath}`);
             }
 
-            emit('debug', 'SCRIPT-LOADER', 'File located in vault');
+            emit('debug', 'SCRIPT-LOADER', 'File located in vault', { scriptPath });
             return file;
         });
     }
@@ -109,7 +111,7 @@ export class ScriptLoaderService implements IScriptLoader {
                 `;
 
                 const func = new Function(wrappedScript)();
-                emit('debug', 'SCRIPT-LOADER', 'Script function created');
+                emit('debug', 'SCRIPT-LOADER', 'Script function created', { scriptPath });
                 return func;
             } catch (error) {
                 emit('error', 'SCRIPT-LOADER', 'Failed to parse script', { error });
@@ -124,7 +126,7 @@ export class ScriptLoaderService implements IScriptLoader {
     private async cacheScript(scriptPath: string, scriptFunction: Function): Promise<void> {
         return await withLogScope('💾 Cache Store', async () => {
             this.scriptCache.set(scriptPath, scriptFunction);
-            emit('debug', 'SCRIPT-LOADER', 'Script cached');
+            emit('debug', 'SCRIPT-LOADER', 'Script cached', { scriptPath });
         });
     }
 
@@ -150,7 +152,9 @@ export class ScriptLoaderService implements IScriptLoader {
             // Cache the function
             await this.cacheScript(cacheKey, scriptFunction);
 
-            emit('debug', 'SCRIPT-LOADER', 'Community script loaded successfully');
+            emit('debug', 'SCRIPT-LOADER', 'Community script loaded successfully', {
+                scriptId
+            });
             return scriptFunction;
         }); // Auto-flush
     }
@@ -161,10 +165,10 @@ export class ScriptLoaderService implements IScriptLoader {
     private async checkCommunityCache(cacheKey: string): Promise<Function | null> {
         return await withLogScope('💾 Cache Check', async () => {
             if (this.scriptCache.has(cacheKey)) {
-                emit('debug', 'SCRIPT-LOADER', 'Cache hit');
+                emit('debug', 'SCRIPT-LOADER', 'Cache hit', { cacheKey });
                 return this.scriptCache.get(cacheKey)!;
             }
-            emit('debug', 'SCRIPT-LOADER', 'Cache miss');
+            emit('debug', 'SCRIPT-LOADER', 'Cache miss', { cacheKey });
             return null;
         });
     }

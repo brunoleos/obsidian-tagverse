@@ -42,7 +42,9 @@ export default class TagversePlugin extends Plugin {
     async onload() {
         // Execute plugin initialization with auto-flush
         await withLogScope('🚀 Plugin Initialization', async () => {
-            emit('debug', 'PLUGIN-INIT', 'Plugin initialization started');
+            emit('debug', 'PLUGIN-INIT', 'Plugin initialization started', {
+                version: this.manifest.version
+            });
 
             TagversePluginInstance = this;
 
@@ -68,7 +70,9 @@ export default class TagversePlugin extends Plugin {
                     () => this.settings,
                     async (settings) => await this.saveSettings(settings)
                 );
-                emit('debug', 'PLUGIN-INIT', 'Community script service initialized');
+                emit('debug', 'PLUGIN-INIT', 'Community script service initialized', {
+                    registryUrl: this.settings.communityRegistryUrl
+                });
             });
 
             // Initialize tag mappings after settings are loaded
@@ -78,7 +82,9 @@ export default class TagversePlugin extends Plugin {
             if (this.settings.checkForUpdatesOnStartup) {
                 await withLogScope('🔄 Update Check', async () => {
                     await this.checkForScriptUpdates();
-                    emit('debug', 'PLUGIN-INIT', 'Script update check completed');
+                    emit('debug', 'PLUGIN-INIT', 'Script update check completed', {
+                        checkForUpdatesOnStartup: this.settings.checkForUpdatesOnStartup
+                    });
                 });
             }
 
@@ -131,7 +137,9 @@ export default class TagversePlugin extends Plugin {
                         this.checkForModeChange();
                     })
                 );
-                emit('debug', 'PLUGIN-INIT', 'Event handlers registered');
+                emit('debug', 'PLUGIN-INIT', 'Event handlers registered', {
+                    refreshOnFileChange: this.settings.refreshOnFileChange
+                });
 
                 // Add settings tab
                 this.settingTab = new TagverseSettingTab(this.app, this);

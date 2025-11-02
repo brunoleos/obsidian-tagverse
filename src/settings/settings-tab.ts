@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { withLogScope, emit } from '../utils/logger';
 import TagversePlugin from '../core/plugin';
 import { TagverseSettings, TagScriptMapping } from '../types/interfaces';
 import { CommunityScriptsTab } from './community-scripts-tab';
@@ -97,27 +98,54 @@ export class TagverseSettingTab extends PluginSettingTab {
         });
 
         // Tab switching
-        generalTab.addEventListener('click', () => {
-            this.switchTab(generalTab, generalContent, [communityTab, submitTab], [communityContent, submitContent]);
-            // Re-render general settings to reflect any changes from community scripts
-            this.renderGeneralSettings(generalContent);
+        generalTab.addEventListener('click', async () => {
+            await withLogScope('📑 Switch to General', async () => {
+                emit('debug', 'SETTINGS-UI', 'General tab clicked');
+                await withLogScope('🔄 Tab Switch', async () => {
+                    this.switchTab(generalTab, generalContent, [communityTab, submitTab], [communityContent, submitContent]);
+                    emit('debug', 'SETTINGS-UI', 'Tab switched to general');
+                });
+                // Re-render general settings to reflect any changes from community scripts
+                await withLogScope('🔄 Re-render Settings', async () => {
+                    this.renderGeneralSettings(generalContent);
+                    emit('debug', 'SETTINGS-UI', 'General settings re-rendered');
+                });
+            });
         });
 
         communityTab.addEventListener('click', async () => {
-            this.switchTab(communityTab, communityContent, [generalTab, submitTab], [generalContent, submitContent]);
+            await withLogScope('📑 Switch to Community', async () => {
+                emit('debug', 'SETTINGS-UI', 'Community tab clicked');
+                await withLogScope('🔄 Tab Switch', async () => {
+                    this.switchTab(communityTab, communityContent, [generalTab, submitTab], [generalContent, submitContent]);
+                    emit('debug', 'SETTINGS-UI', 'Tab switched to community');
+                });
 
-            // Render community scripts
-            const communityTabInstance = new CommunityScriptsTab(
-                this.app,
-                this.plugin,
-                this.plugin.communityService
-            );
-            await communityTabInstance.render(communityContent);
+                // Render community scripts
+                await withLogScope('📚 Render Community Scripts', async () => {
+                    const communityTabInstance = new CommunityScriptsTab(
+                        this.app,
+                        this.plugin,
+                        this.plugin.communityService
+                    );
+                    await communityTabInstance.render(communityContent);
+                    emit('debug', 'SETTINGS-UI', 'Community scripts rendered');
+                });
+            });
         });
 
-        submitTab.addEventListener('click', () => {
-            this.switchTab(submitTab, submitContent, [generalTab, communityTab], [generalContent, communityContent]);
-            this.renderSubmitTab(submitContent);
+        submitTab.addEventListener('click', async () => {
+            await withLogScope('📑 Switch to Submit', async () => {
+                emit('debug', 'SETTINGS-UI', 'Submit tab clicked');
+                await withLogScope('🔄 Tab Switch', async () => {
+                    this.switchTab(submitTab, submitContent, [generalTab, communityTab], [generalContent, communityContent]);
+                    emit('debug', 'SETTINGS-UI', 'Tab switched to submit');
+                });
+                await withLogScope('📝 Render Submit Tab', async () => {
+                    this.renderSubmitTab(submitContent);
+                    emit('debug', 'SETTINGS-UI', 'Submit tab rendered');
+                });
+            });
         });
 
         // Render general settings
@@ -163,9 +191,15 @@ export class TagverseSettingTab extends PluginSettingTab {
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.refreshOnFileChange)
                 .onChange(async (value) => {
-                    const settings = this.plugin.settings;
-                    settings.refreshOnFileChange = value;
-                    await this.plugin.saveSettings(settings);
+                    await withLogScope('🔄 Toggle Refresh Setting', async () => {
+                        emit('debug', 'SETTINGS-UI', 'Refresh on file change toggled', { value });
+                        await withLogScope('💾 Save Settings', async () => {
+                            const settings = this.plugin.settings;
+                            settings.refreshOnFileChange = value;
+                            await this.plugin.saveSettings(settings);
+                            emit('debug', 'SETTINGS-UI', 'Settings saved');
+                        });
+                    });
                 })
             );
 
@@ -179,9 +213,15 @@ export class TagverseSettingTab extends PluginSettingTab {
                 .addOption('error', 'Error')
                 .setValue(this.plugin.settings.logLevel)
                 .onChange(async (value) => {
-                    const settings = this.plugin.settings;
-                    settings.logLevel = value as LogCategory;
-                    await this.plugin.saveSettings(settings);
+                    await withLogScope('🔄 Change Log Level', async () => {
+                        emit('debug', 'SETTINGS-UI', 'Log level changed', { value });
+                        await withLogScope('💾 Save Settings', async () => {
+                            const settings = this.plugin.settings;
+                            settings.logLevel = value as LogCategory;
+                            await this.plugin.saveSettings(settings);
+                            emit('debug', 'SETTINGS-UI', 'Settings saved');
+                        });
+                    });
                 })
             );
 
@@ -210,14 +250,26 @@ export class TagverseSettingTab extends PluginSettingTab {
                 .setButtonText('Add mapping')
                 .setCta()
                 .onClick(async () => {
-                    const settings = this.plugin.settings;
-                    settings.tagMappings.push({
-                        tag: '',
-                        scriptPath: '',
-                        enabled: true
+                    await withLogScope('➕ Add Mapping', async () => {
+                        emit('debug', 'SETTINGS-UI', 'Add mapping button clicked');
+                        await withLogScope('📝 Create Mapping', async () => {
+                            const settings = this.plugin.settings;
+                            settings.tagMappings.push({
+                                tag: '',
+                                scriptPath: '',
+                                enabled: true
+                            });
+                            emit('debug', 'SETTINGS-UI', 'New mapping added to settings');
+                        });
+                        await withLogScope('💾 Save Settings', async () => {
+                            await this.plugin.saveSettings(this.plugin.settings);
+                            emit('debug', 'SETTINGS-UI', 'Settings saved');
+                        });
+                        await withLogScope('🔄 Re-render UI', async () => {
+                            this.display();
+                            emit('debug', 'SETTINGS-UI', 'Settings UI re-rendered');
+                        });
                     });
-                    await this.plugin.saveSettings(settings);
-                    this.display();
                 })
             );
 
@@ -244,9 +296,16 @@ export class TagverseSettingTab extends PluginSettingTab {
                 cls: 'tag-input',
             });
             tagInput.addEventListener('input', async (e) => {
-                const settings = this.plugin.settings;
-                mapping.tag = (e.target as HTMLInputElement).value;
-                await this.plugin.saveSettings(settings);
+                await withLogScope('✏️ Edit Tag Name', async () => {
+                    const newValue = (e.target as HTMLInputElement).value;
+                    emit('debug', 'SETTINGS-UI', 'Tag name changed', { index, oldValue: mapping.tag, newValue });
+                    await withLogScope('💾 Save Settings', async () => {
+                        const settings = this.plugin.settings;
+                        mapping.tag = newValue;
+                        await this.plugin.saveSettings(settings);
+                        emit('debug', 'SETTINGS-UI', 'Settings saved');
+                    });
+                });
             });
 
             // Script dropdown - flexible width
@@ -275,9 +334,16 @@ export class TagverseSettingTab extends PluginSettingTab {
 
             scriptSelect.value = mapping.scriptPath;
             scriptSelect.addEventListener('change', async (e) => {
-                const settings = this.plugin.settings;
-                mapping.scriptPath = (e.target as HTMLSelectElement).value;
-                await this.plugin.saveSettings(settings);
+                await withLogScope('🔧 Change Script Path', async () => {
+                    const newValue = (e.target as HTMLSelectElement).value;
+                    emit('debug', 'SETTINGS-UI', 'Script path changed', { index, oldValue: mapping.scriptPath, newValue });
+                    await withLogScope('💾 Save Settings', async () => {
+                        const settings = this.plugin.settings;
+                        mapping.scriptPath = newValue;
+                        await this.plugin.saveSettings(settings);
+                        emit('debug', 'SETTINGS-UI', 'Settings saved');
+                    });
+                });
             });
 
             // Enable toggle - using Obsidian's native checkbox styling
@@ -288,11 +354,18 @@ export class TagverseSettingTab extends PluginSettingTab {
 
             // Make the entire container clickable like Obsidian does
             checkboxWrapper.addEventListener('click', async (e) => {
-                e.preventDefault();
-                mapping.enabled = !mapping.enabled;
-                checkboxWrapper.className = 'checkbox-container' + (mapping.enabled ? ' is-enabled' : '');
-                const settings = this.plugin.settings;
-                await this.plugin.saveSettings(settings);
+                await withLogScope('🔄 Toggle Mapping', async () => {
+                    e.preventDefault();
+                    const newValue = !mapping.enabled;
+                    emit('debug', 'SETTINGS-UI', 'Mapping enabled toggled', { index, oldValue: mapping.enabled, newValue });
+                    await withLogScope('💾 Save Settings', async () => {
+                        mapping.enabled = newValue;
+                        checkboxWrapper.className = 'checkbox-container' + (newValue ? ' is-enabled' : '');
+                        const settings = this.plugin.settings;
+                        await this.plugin.saveSettings(settings);
+                        emit('debug', 'SETTINGS-UI', 'Settings saved');
+                    });
+                });
             });
 
             // Delete button - fixed width, using trash icon style like other settings
@@ -307,10 +380,22 @@ export class TagverseSettingTab extends PluginSettingTab {
 
             // Add click event
             deleteButton.addEventListener('click', async () => {
-                const settings = this.plugin.settings;
-                settings.tagMappings.splice(index, 1);
-                await this.plugin.saveSettings(settings);
-                this.display();
+                await withLogScope('🗑️ Delete Mapping', async () => {
+                    emit('debug', 'SETTINGS-UI', 'Delete mapping button clicked', { index, tag: mapping.tag });
+                    await withLogScope('🗑️ Remove Mapping', async () => {
+                        const settings = this.plugin.settings;
+                        settings.tagMappings.splice(index, 1);
+                        emit('debug', 'SETTINGS-UI', 'Mapping removed from settings');
+                    });
+                    await withLogScope('💾 Save Settings', async () => {
+                        await this.plugin.saveSettings(this.plugin.settings);
+                        emit('debug', 'SETTINGS-UI', 'Settings saved');
+                    });
+                    await withLogScope('🔄 Re-render UI', async () => {
+                        this.display();
+                        emit('debug', 'SETTINGS-UI', 'Settings UI re-rendered');
+                    });
+                });
             });
         });
     }
@@ -330,9 +415,19 @@ export class TagverseSettingTab extends PluginSettingTab {
             .addButton(btn => btn
                 .setButtonText('Start Submission')
                 .setCta()
-                .onClick(() => {
-                    const modal = new ScriptSubmissionModal(this.app, this.plugin);
-                    modal.open();
+                .onClick(async () => {
+                    await withLogScope('🚀 Open Submission Modal', async () => {
+                        emit('debug', 'SETTINGS-UI', 'Submit script button clicked');
+                        let modal: ScriptSubmissionModal;
+                        await withLogScope('📝 Create Modal', async () => {
+                            modal = new ScriptSubmissionModal(this.app, this.plugin);
+                            emit('debug', 'SETTINGS-UI', 'Submission modal created');
+                        });
+                        await withLogScope('🔄 Open Modal', async () => {
+                            modal!.open();
+                            emit('debug', 'SETTINGS-UI', 'Submission modal opened');
+                        });
+                    });
                 })
             );
 

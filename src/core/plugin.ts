@@ -124,17 +124,32 @@ export default class TagversePlugin extends Plugin {
 
                 // Register event for file changes if enabled
                 this.registerEvent(
-                    this.app.workspace.on('file-open', (file) => {
+                    this.app.workspace.on('file-open', async (file) => {
                         if (this.settings.refreshOnFileChange) {
-                            this.refreshActiveView();
+                            await withLogScope('📂 File Opened', async () => {
+                                emit('debug', 'PLUGIN-EVENT', 'File opened, refreshing tags', {
+                                    filePath: file?.path || 'unknown',
+                                    refreshOnFileChange: this.settings.refreshOnFileChange
+                                });
+                                await withLogScope('🔄 Refresh Tags', async () => {
+                                    this.refreshActiveView();
+                                    emit('debug', 'PLUGIN-EVENT', 'Tag refresh completed');
+                                });
+                            });
                         }
                     })
                 );
 
                 // Register event for layout changes to detect mode switches
                 this.registerEvent(
-                    this.app.workspace.on('layout-change', () => {
-                        this.checkForModeChange();
+                    this.app.workspace.on('layout-change', async () => {
+                        await withLogScope('🔄 Layout Changed', async () => {
+                            emit('debug', 'PLUGIN-EVENT', 'Layout change detected');
+                            await withLogScope('🔍 Check Mode Change', async () => {
+                                this.checkForModeChange();
+                                emit('debug', 'PLUGIN-EVENT', 'Mode change check completed');
+                            });
+                        });
                     })
                 );
                 emit('debug', 'PLUGIN-INIT', 'Event handlers registered', {
@@ -150,9 +165,16 @@ export default class TagversePlugin extends Plugin {
                 this.addCommand({
                     id: 'refresh-dynamic-tags',
                     name: 'Refresh tagverses in current note',
-                    callback: () => {
-                        this.refreshActiveView();
-                        new Notice('Tagverses refreshed');
+                    callback: async () => {
+                        await withLogScope('🔄 Manual Refresh', async () => {
+                            emit('debug', 'PLUGIN-COMMAND', 'Manual refresh command executed');
+                            await withLogScope('🔄 Refresh Tags', async () => {
+                                this.refreshActiveView();
+                                emit('debug', 'PLUGIN-COMMAND', 'Tag refresh completed');
+                            });
+                            new Notice('Tagverses refreshed');
+                            emit('info', 'PLUGIN-COMMAND', 'Manual refresh completed');
+                        });
                     }
                 });
 
@@ -160,9 +182,16 @@ export default class TagversePlugin extends Plugin {
                 this.addCommand({
                     id: 'clear-script-cache',
                     name: 'Clear script cache',
-                    callback: () => {
-                        this.scriptLoader.clearCache();
-                        new Notice('Script cache cleared');
+                    callback: async () => {
+                        await withLogScope('🗑️ Clear Cache', async () => {
+                            emit('debug', 'PLUGIN-COMMAND', 'Clear cache command executed');
+                            await withLogScope('🗑️ Cache Operations', async () => {
+                                this.scriptLoader.clearCache();
+                                emit('debug', 'PLUGIN-COMMAND', 'Script cache cleared');
+                            });
+                            new Notice('Script cache cleared');
+                            emit('info', 'PLUGIN-COMMAND', 'Cache clear completed');
+                        });
                     }
                 });
                 emit('debug', 'PLUGIN-INIT', 'Commands registered');
@@ -201,17 +230,34 @@ export default class TagversePlugin extends Plugin {
     /**
      * Handle settings changes - update dependent services
      */
-    private onSettingsChanged(): void {
-        const settings = this.settings;
+    private async onSettingsChanged(): Promise<void> {
+        await withLogScope('⚙️ Settings Changed', async () => {
+            const settings = this.settings;
+            emit('debug', 'PLUGIN-SETTINGS', 'Settings change detected', {
+                tagMappingsCount: settings.tagMappings.length,
+                logLevel: settings.logLevel
+            });
 
-        // Update tag mappings
-        this.tagMapping.rebuildMappings(settings.tagMappings);
+            // Update tag mappings
+            await withLogScope('🗺️ Update Mappings', async () => {
+                this.tagMapping.rebuildMappings(settings.tagMappings);
+                emit('debug', 'PLUGIN-SETTINGS', 'Tag mappings updated');
+            });
 
-        // Clear script cache when settings change
-        this.scriptLoader.clearCache();
+            // Clear script cache when settings change
+            await withLogScope('🗑️ Clear Cache', async () => {
+                this.scriptLoader.clearCache();
+                emit('debug', 'PLUGIN-SETTINGS', 'Script cache cleared');
+            });
 
-        // Refresh active view
-        this.refreshActiveView();
+            // Refresh active view
+            await withLogScope('🔄 Refresh View', async () => {
+                this.refreshActiveView();
+                emit('debug', 'PLUGIN-SETTINGS', 'Active view refreshed');
+            });
+
+            emit('info', 'PLUGIN-SETTINGS', 'Settings change handling completed');
+        });
     }
 
     /**

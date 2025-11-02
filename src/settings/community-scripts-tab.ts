@@ -1,4 +1,5 @@
 import { App, Notice, Setting } from 'obsidian';
+import { withLogScope, emit } from '../utils/logger';
 import TagversePlugin from '../core/plugin';
 import { CommunityScriptMetadata } from '../types/interfaces';
 import { CommunityScriptService } from '../services/community-script.service';
@@ -54,9 +55,15 @@ export class CommunityScriptsTab {
             .addText(text => text
                 .setPlaceholder('Search by name, description, author...')
                 .setValue(this.searchQuery)
-                .onChange(value => {
-                    this.searchQuery = value;
-                    this.renderScriptGrid(containerEl);
+                .onChange(async (value) => {
+                    await withLogScope('🔍 Search Scripts', async () => {
+                        emit('debug', 'COMMUNITY-UI', 'Search query changed', { oldValue: this.searchQuery, newValue: value });
+                        this.searchQuery = value;
+                        await withLogScope('🔄 Update Results', async () => {
+                            this.renderScriptGrid(containerEl);
+                            emit('debug', 'COMMUNITY-UI', 'Script grid updated');
+                        });
+                    });
                 })
             );
 
@@ -70,14 +77,23 @@ export class CommunityScriptsTab {
                 cls: this.selectedLabels.includes(label) ? 'label-filter active' : 'label-filter'
             });
 
-            labelBtn.addEventListener('click', () => {
-                if (this.selectedLabels.includes(label)) {
-                    this.selectedLabels = this.selectedLabels.filter(l => l !== label);
-                } else {
-                    this.selectedLabels.push(label);
-                }
-                this.renderControls(containerEl);
-                this.renderScriptGrid(containerEl);
+            labelBtn.addEventListener('click', async () => {
+                await withLogScope('🏷️ Toggle Label Filter', async () => {
+                    const wasSelected = this.selectedLabels.includes(label);
+                    emit('debug', 'COMMUNITY-UI', 'Label filter toggled', { label, wasSelected, newState: !wasSelected });
+
+                    if (wasSelected) {
+                        this.selectedLabels = this.selectedLabels.filter(l => l !== label);
+                    } else {
+                        this.selectedLabels.push(label);
+                    }
+
+                    await withLogScope('🔄 Update UI', async () => {
+                        this.renderControls(containerEl);
+                        this.renderScriptGrid(containerEl);
+                        emit('debug', 'COMMUNITY-UI', 'UI updated with new filters');
+                    });
+                });
             });
         });
 
@@ -86,10 +102,19 @@ export class CommunityScriptsTab {
             new Setting(controlsContainer)
                 .addButton(btn => btn
                     .setButtonText('Clear filters')
-                    .onClick(() => {
-                        this.searchQuery = '';
-                        this.selectedLabels = [];
-                        this.render(containerEl.parentElement!);
+                    .onClick(async () => {
+                        await withLogScope('🧹 Clear Filters', async () => {
+                            emit('debug', 'COMMUNITY-UI', 'Clear filters button clicked', {
+                                hadSearch: !!this.searchQuery,
+                                hadLabels: this.selectedLabels.length
+                            });
+                            this.searchQuery = '';
+                            this.selectedLabels = [];
+                            await withLogScope('🔄 Re-render Tab', async () => {
+                                this.render(containerEl.parentElement!);
+                                emit('debug', 'COMMUNITY-UI', 'Community tab re-rendered');
+                            });
+                        });
                     })
                 );
         }
@@ -174,14 +199,19 @@ export class CommunityScriptsTab {
                     cls: 'mod-cta'
                 });
                 updateBtn.addEventListener('click', async () => {
-                    updateBtn.disabled = true;
-                    updateBtn.setText('Updating...');
-                    try {
-                        await this.handleUpdate(script.id, updateBtn);
-                    } catch (error) {
-                        updateBtn.disabled = false;
-                        updateBtn.setText(`Update to v${script.version}`);
-                    }
+                    await withLogScope('⬆️ Update Script', async () => {
+                        emit('debug', 'COMMUNITY-UI', 'Update button clicked', { scriptId: script.id, currentVersion: installed.version, targetVersion: script.version });
+                        updateBtn.disabled = true;
+                        updateBtn.setText('Updating...');
+                        try {
+                            await this.handleUpdate(script.id, updateBtn);
+                            emit('info', 'COMMUNITY-UI', 'Script update completed', { scriptId: script.id });
+                        } catch (error) {
+                            updateBtn.disabled = false;
+                            updateBtn.setText(`Update to v${script.version}`);
+                            emit('error', 'COMMUNITY-UI', 'Script update failed', { scriptId: script.id, error: error.message });
+                        }
+                    });
                 });
             }
 
@@ -190,14 +220,19 @@ export class CommunityScriptsTab {
                 cls: 'mod-warning'
             });
             uninstallBtn.addEventListener('click', async () => {
-                uninstallBtn.disabled = true;
-                uninstallBtn.setText('Uninstalling...');
-                try {
-                    await this.handleUninstall(script.id, uninstallBtn);
-                } catch (error) {
-                    uninstallBtn.disabled = false;
-                    uninstallBtn.setText('Uninstall');
-                }
+                await withLogScope('🗑️ Uninstall Script', async () => {
+                    emit('debug', 'COMMUNITY-UI', 'Uninstall button clicked', { scriptId: script.id, version: installed.version });
+                    uninstallBtn.disabled = true;
+                    uninstallBtn.setText('Uninstalling...');
+                    try {
+                        await this.handleUninstall(script.id, uninstallBtn);
+                        emit('info', 'COMMUNITY-UI', 'Script uninstall completed', { scriptId: script.id });
+                    } catch (error) {
+                        uninstallBtn.disabled = false;
+                        uninstallBtn.setText('Uninstall');
+                        emit('error', 'COMMUNITY-UI', 'Script uninstall failed', { scriptId: script.id, error: error.message });
+                    }
+                });
             });
         } else {
             // Not installed - show install button
@@ -206,24 +241,33 @@ export class CommunityScriptsTab {
                 cls: 'mod-cta'
             });
             installBtn.addEventListener('click', async () => {
-                // Disable button and show loading state
-                installBtn.disabled = true;
-                installBtn.setText('Installing...');
+                await withLogScope('📦 Install Script', async () => {
+                    emit('debug', 'COMMUNITY-UI', 'Install button clicked', { scriptId: script.id, version: script.version });
+                    // Disable button and show loading state
+                    installBtn.disabled = true;
+                    installBtn.setText('Installing...');
 
-                try {
-                    await this.handleInstall(script.id, installBtn);
-                } catch (error) {
-                    // Re-enable button on error
-                    installBtn.disabled = false;
-                    installBtn.setText('Install');
-                }
+                    try {
+                        await this.handleInstall(script.id, installBtn);
+                        emit('info', 'COMMUNITY-UI', 'Script install completed', { scriptId: script.id });
+                    } catch (error) {
+                        // Re-enable button on error
+                        installBtn.disabled = false;
+                        installBtn.setText('Install');
+                        emit('error', 'COMMUNITY-UI', 'Script install failed', { scriptId: script.id, error: error.message });
+                    }
+                });
             });
         }
 
         // View details button
         const detailsBtn = actions.createEl('button', { text: 'Details' });
         detailsBtn.addEventListener('click', () => {
-            window.open(script.urls.readme, '_blank');
+            withLogScope('📖 View Script Details', () => {
+                emit('debug', 'COMMUNITY-UI', 'Details button clicked', { scriptId: script.id, url: script.urls.readme });
+                window.open(script.urls.readme, '_blank');
+                emit('info', 'COMMUNITY-UI', 'Script details opened in browser', { scriptId: script.id });
+            });
         });
     }
 

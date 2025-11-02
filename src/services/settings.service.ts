@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { logger, setDefaultLogLevel, setDefaultLoggerOptions, LogCategory } from '../utils/logger';
+import { createScopedLogger, setDefaultLogLevel, setDefaultLoggerOptions, LogCategory } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -26,45 +26,78 @@ export class SettingsService implements ISettingsService {
      * Save settings
      */
     async saveSettings(settings: TagverseSettings): Promise<void> {
-        this.settings = settings;
-        await this.plugin.saveData(settings);
+        const saveLogger = createScopedLogger('⚙️ Save Settings');
 
-        // Update logger configuration
-        setDefaultLogLevel(settings.logLevel || 'debug');
+        try {
+            this.settings = settings;
 
-        logger.info('SETTINGS', 'Settings saved', {
-            mappingCount: settings.tagMappings.length,
-            logLevel: settings.logLevel
-        });
+            await saveLogger.withScope('💾 Write to Disk', async (diskLogger) => {
+                await this.plugin.saveData(settings);
+                diskLogger.info('SETTINGS', 'Settings written to disk');
+            });
 
-        // Notify all registered callbacks
-        this.notifyCallbacks();
+            await saveLogger.withScope('🔧 Update Log Level', async (logLevelLogger) => {
+                setDefaultLogLevel(settings.logLevel || 'debug');
+                logLevelLogger.info('SETTINGS', 'Log level updated', {
+                    logLevel: settings.logLevel
+                });
+            });
+
+            saveLogger.info('SETTINGS', 'Settings saved', {
+                mappingCount: settings.tagMappings.length,
+                logLevel: settings.logLevel
+            });
+
+            // Notify all registered callbacks
+            await saveLogger.withScope('📢 Notify Callbacks', async (callbackLogger) => {
+                this.notifyCallbacks();
+                callbackLogger.info('SETTINGS', `Notified ${this.changeCallbacks.length} callback(s)`);
+            });
+        } finally {
+            saveLogger.flush();
+        }
     }
 
     /**
      * Load settings from storage
      */
     async loadSettings(): Promise<void> {
-        const loadedData = await this.plugin.loadData();
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
+        const loadLogger = createScopedLogger('⚙️ Load Settings');
 
-        // Update logger configuration
-        setDefaultLogLevel(this.settings.logLevel || 'debug');
-
-        logger.info('SETTINGS', 'Settings loaded', {
-            mappingCount: this.settings.tagMappings.length,
-            refreshOnFileChange: this.settings.refreshOnFileChange,
-            logLevel: this.settings.logLevel
-        });
-
-        this.settings.tagMappings.forEach((m, i) => {
-            logger.debug('SETTINGS', 'Mapping configured', {
-                index: i,
-                tag: m.tag,
-                script: m.scriptPath,
-                enabled: m.enabled
+        try {
+            await loadLogger.withScope('📖 Read from Disk', async (diskLogger) => {
+                const loadedData = await this.plugin.loadData();
+                this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
+                diskLogger.info('SETTINGS', 'Settings read from disk');
             });
-        });
+
+            await loadLogger.withScope('🔧 Update Log Level', async (logLevelLogger) => {
+                setDefaultLogLevel(this.settings.logLevel || 'debug');
+                logLevelLogger.info('SETTINGS', 'Log level updated', {
+                    logLevel: this.settings.logLevel
+                });
+            });
+
+            loadLogger.info('SETTINGS', 'Settings loaded', {
+                mappingCount: this.settings.tagMappings.length,
+                refreshOnFileChange: this.settings.refreshOnFileChange,
+                logLevel: this.settings.logLevel
+            });
+
+            await loadLogger.withScope('🗺️ Log Mappings', async (mappingLogger) => {
+                this.settings.tagMappings.forEach((m, i) => {
+                    mappingLogger.debug('SETTINGS', 'Mapping configured', {
+                        index: i,
+                        tag: m.tag,
+                        script: m.scriptPath,
+                        enabled: m.enabled
+                    });
+                });
+                mappingLogger.info('SETTINGS', `Logged ${this.settings.tagMappings.length} mapping(s)`);
+            });
+        } finally {
+            loadLogger.flush();
+        }
     }
 
     /**
@@ -78,12 +111,18 @@ export class SettingsService implements ISettingsService {
      * Notify all registered callbacks of settings changes
      */
     private notifyCallbacks(): void {
-        this.changeCallbacks.forEach(callback => {
-            try {
-                callback(this.settings);
-            } catch (error) {
-                logger.error('ERROR-HANDLING', 'Settings change callback failed', error as Error);
-            }
-        });
+        const notifyLogger = createScopedLogger('📢 Callback Notification');
+
+        try {
+            this.changeCallbacks.forEach((callback, index) => {
+                try {
+                    callback(this.settings);
+                } catch (error) {
+                    notifyLogger.error('ERROR-HANDLING', `Callback ${index} failed`, error as Error);
+                }
+            });
+        } finally {
+            notifyLogger.flush();
+        }
     }
 }

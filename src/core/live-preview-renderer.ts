@@ -73,28 +73,39 @@ export class LivePreviewRenderer extends TagRenderer {
         this.container!.textContent = `Loading #${this.tag}...`;
 
         try {
-            // Execute script and get result
-            const result = await this.executeScript(frontmatter, args);
+            await this.logger.withScope('🎨 Render Tag', async (renderLogger) => {
+                // Execute script and get result (executeScript has its own nested scopes)
+                const result = await this.executeScript(frontmatter, args);
 
-            // Process the result into an HTMLElement
-            const contentElement = this.processScriptResult(result);
+                // Process the result into an HTMLElement with nested scope
+                const contentElement = await renderLogger.withScope('🔄 Process Result', async (processLogger) => {
+                    const element = this.processScriptResult(result);
+                    processLogger.debug('RENDER-PIPELINE', 'Script result processed into DOM element');
+                    return element;
+                });
 
-            // Update container with rendered content
-            this.container!.innerHTML = '';
-            this.container!.appendChild(contentElement);
+                // Update container with rendered content
+                await renderLogger.withScope('🔄 Update Container', async (updateLogger) => {
+                    this.container!.innerHTML = '';
+                    this.container!.appendChild(contentElement);
+                    updateLogger.debug('RENDER-PIPELINE', 'Container updated with rendered content');
+                });
 
-            // Mark rendering as successful
-            this.logger.info('RENDER-LIVE', 'Tag rendered successfully', {
-                tag: this.tag
+                // Mark rendering as successful
+                renderLogger.info('RENDER-LIVE', 'Tag rendered successfully', {
+                    tag: this.tag
+                });
             });
         } catch (error) {
-            // Handle error
-            const errorEl = this.handleError(error as Error);
-            this.container!.innerHTML = '';
-            this.container!.appendChild(errorEl);
+            await this.logger.withScope('❌ Handle Error', async (errorLogger) => {
+                // Handle error
+                const errorEl = this.handleError(error as Error);
+                this.container!.innerHTML = '';
+                this.container!.appendChild(errorEl);
 
-            // Log error
-            this.logger.error('RENDER-LIVE', 'Tag rendering failed', error as Error);
+                // Log error
+                errorLogger.error('RENDER-LIVE', 'Tag rendering failed', error as Error);
+            });
         } finally {
             // Auto-flush root scope
             this.logger.flush();

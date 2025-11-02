@@ -42,18 +42,20 @@ export class ReadingModeRenderer extends TagRenderer {
      */
     async render(frontmatter: any): Promise<void> {
         try {
-            await this.renderSuccessfully(frontmatter);
-            this.rendered = true;
+            await this.logger.withScope('🎨 Render Tag', async (renderLogger) => {
+                await this.renderSuccessfully(frontmatter, renderLogger);
+                this.rendered = true;
 
-            // Mark rendering as successful
-            this.logger.info('RENDER-READING', 'Tag rendered successfully', {
-                tag: this.tag
+                // Mark rendering as successful
+                renderLogger.info('RENDER-READING', 'Tag rendered successfully', {
+                    tag: this.tag
+                });
             });
         } catch (error) {
-            this.handleRenderError(error);
-
-            // Log error
-            this.logger.error('RENDER-READING', 'Tag rendering failed', error as Error);
+            await this.logger.withScope('❌ Handle Error', async (errorLogger) => {
+                this.handleRenderError(error);
+                errorLogger.error('RENDER-READING', 'Tag rendering failed', error as Error);
+            });
         } finally {
             // Auto-flush happens since this is root scope
             this.logger.flush();
@@ -63,18 +65,30 @@ export class ReadingModeRenderer extends TagRenderer {
     /**
      * Execute successful rendering pipeline: script → DOM replacement → cleanup
      */
-    private async renderSuccessfully(frontmatter: any): Promise<void> {
-        // Execute script and create content
+    private async renderSuccessfully(frontmatter: any, parentLogger: ScopedLogger): Promise<void> {
+        // Execute script and create content (executeScript has its own nested scopes)
         const result = await this.executeScript(frontmatter, this.args);
-        const contentElement = this.processScriptResult(result);
 
-        // Create wrapper and replace tag element
-        const wrapper = createSpan();
-        wrapper.appendChild(contentElement);
-        this.targetElement.replaceWith(wrapper);
+        // Process the result with nested scope
+        const contentElement = await parentLogger.withScope('🔄 Process Result', async (processLogger) => {
+            const element = this.processScriptResult(result);
+            processLogger.debug('RENDER-PIPELINE', 'Script result processed into DOM element');
+            return element;
+        });
 
-        // Clean up any arguments text (search next to wrapper now in DOM)
-        this.performArgsCleanup(wrapper);
+        // DOM replacement with nested scope
+        await parentLogger.withScope('🔄 DOM Replacement', async (domLogger) => {
+            const wrapper = createSpan();
+            wrapper.appendChild(contentElement);
+            this.targetElement.replaceWith(wrapper);
+            domLogger.debug('RENDER-PIPELINE', 'Tag element replaced with rendered content');
+
+            // Clean up any arguments text (search next to wrapper now in DOM)
+            await domLogger.withScope('🧹 Args Cleanup', async (cleanupLogger) => {
+                this.performArgsCleanup(wrapper);
+                cleanupLogger.debug('RENDER-PIPELINE', 'Arguments text cleaned up');
+            });
+        });
     }
 
     /**

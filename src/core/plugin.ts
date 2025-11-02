@@ -3,7 +3,7 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { LoggerFactory, ScopedLogger, LogCategory } from '../utils/logger';
+import { createScopedLogger, ScopedLogger, LogCategory } from '../utils/logger';
 import { LivePreviewRenderer } from './live-preview-renderer';
 import { ReadingModeRenderer } from './reading-mode-renderer';
 import { TagverseSettingTab } from '../settings/settings-tab';
@@ -24,7 +24,6 @@ export let TagversePluginInstance: TagversePlugin | null = null;
  */
 export default class TagversePlugin extends Plugin {
     // Service instances (dependency injection)
-    private loggerFactory: LoggerFactory;
     private scriptLoader: IScriptLoader;
     private tagMapping: ITagMappingProvider;
     private settingsService: ISettingsService;
@@ -41,14 +40,8 @@ export default class TagversePlugin extends Plugin {
     }
 
     async onload() {
-        // Create logger factory first
-        this.loggerFactory = new LoggerFactory({
-            showNoticeOnError: true,
-            showNoticeOnWarning: false
-        });
-
         // Create scoped logger for initialization
-        const initLogger = this.loggerFactory.createScoped('🚀 Plugin Initialization');
+        const initLogger = createScopedLogger('🚀 Plugin Initialization');
 
         try {
             initLogger.info('PLUGIN-INIT', 'Plugin initialization started');
@@ -66,11 +59,8 @@ export default class TagversePlugin extends Plugin {
                 logLevel: this.settings.logLevel
             });
 
-            // Update logger factory with settings
-            this.loggerFactory.setLogLevel(this.settings.logLevel || 'debug');
-
             // Initialize community script service
-            const communityLogger = this.loggerFactory.createScoped('Community Scripts');
+            const communityLogger = createScopedLogger('Community Scripts');
             this.communityService = new CommunityScriptService(
                 this.app,
                 () => this.settings,
@@ -180,16 +170,15 @@ export default class TagversePlugin extends Plugin {
      */
     private initializeServices(): void {
         // Create logger instances for services
-        const tagMappingLogger = this.loggerFactory.createScoped('Tag Mapping');
+        const tagMappingLogger = createScopedLogger('Tag Mapping');
 
         // Create service instances
         this.scriptLoader = new ScriptLoaderService();
         this.tagMapping = new TagMappingService(tagMappingLogger);
-        this.settingsService = new SettingsService(this, this.loggerFactory);
+        this.settingsService = new SettingsService(this);
         this.rendererFactory = new RendererFactoryService(
             this.scriptLoader,
-            this.app,
-            this.loggerFactory
+            this.app
         );
     }
 

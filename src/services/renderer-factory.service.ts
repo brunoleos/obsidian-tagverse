@@ -3,7 +3,7 @@ import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader } from './interfaces';
 import { LivePreviewRenderer } from '../core/live-preview-renderer';
 import { ReadingModeRenderer } from '../core/reading-mode-renderer';
-import { LoggerFactory } from '../utils/logger';
+import { createScopedLogger } from '../utils/logger';
 
 /**
  * Factory service for creating renderer instances.
@@ -13,8 +13,7 @@ import { LoggerFactory } from '../utils/logger';
 export class RendererFactoryService {
     constructor(
         private scriptLoader: IScriptLoader,
-        private app: App,
-        private loggerFactory: LoggerFactory
+        private app: App
     ) {}
 
     /**
@@ -28,7 +27,7 @@ export class RendererFactoryService {
         args: any = {}
     ): LivePreviewRenderer {
         // Create operation-specific scoped logger
-        const logger = this.loggerFactory.createScoped(`🎨 Rendering #${tag}`);
+        const logger = createScopedLogger(`🎨 Rendering #${tag}`);
 
         return new LivePreviewRenderer(
             this.scriptLoader,
@@ -59,7 +58,7 @@ export class RendererFactoryService {
             ? `📖 Processing #${tag} at pos:${position}`
             : `📖 Processing #${tag}`;
 
-        const logger = this.loggerFactory.createScoped(label);
+        const logger = createScopedLogger(label);
 
         return new ReadingModeRenderer(
             this.scriptLoader,

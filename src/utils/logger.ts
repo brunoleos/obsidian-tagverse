@@ -1,4 +1,4 @@
-// ========== REFACTORED LOGGER SYSTEM WITH CONSTRUCTOR INJECTION ==========
+// ========== LOGGER SYSTEM ==========
 import { Notice } from 'obsidian';
 
 // ========== Types ==========
@@ -18,20 +18,17 @@ export interface LogEntry {
     timestamp: Date;
 }
 
-// ========== InstantLogger - Immediate Console Logging ==========
+// ========== LoggerConfig - Shared Configuration for All Loggers ==========
 
 /**
- * InstantLogger - Logs immediately to console without buffering.
- * Use for user-facing operations, services, and real-time feedback.
+ * LoggerConfig - Shared configuration for both InstantLogger and ScopedLogger.
+ * Ensures consistent behavior and settings across all logging.
  */
-export class InstantLogger {
+export class LoggerConfig {
     constructor(
-        private readonly prefix: string = '[TAGVERSE]',
-        private logLevel: LogCategory = 'debug',
-        private options: LoggerOptions = {}
+        public logLevel: LogCategory = 'debug',
+        public options: LoggerOptions = {}
     ) {}
-
-    // ========== Configuration ==========
 
     setLogLevel(level: LogCategory): void {
         this.logLevel = level;
@@ -41,50 +38,69 @@ export class InstantLogger {
         this.options = { ...this.options, ...options };
     }
 
+    shouldLog(level: LogCategory): boolean {
+        const levels: LogCategory[] = ['debug', 'info', 'warning', 'error'];
+        return levels.indexOf(level) >= levels.indexOf(this.logLevel);
+    }
+
+    formatUserMessage(component: string, event: string): string {
+        const friendlyComponent = component.replace(/-/g, ' ').toLowerCase();
+        const friendlyEvent = event.replace(/_/g, ' ').toLowerCase();
+        return `${friendlyComponent}: ${friendlyEvent}`;
+    }
+}
+
+// ========== InstantLogger - Immediate Console Logging ==========
+
+/**
+ * InstantLogger - Logs immediately to console without buffering.
+ * Use for user-facing operations, services, and real-time feedback.
+ */
+export class InstantLogger {
+    constructor(
+        private readonly prefix: string = '[TAGVERSE]',
+        private readonly config: LoggerConfig
+    ) {}
+
     // ========== Logging Methods ==========
 
     debug(component: string, event: string, data?: any): void {
-        if (this.shouldLog('debug')) {
+        if (this.config.shouldLog('debug')) {
             this.flushImmediate('debug', component, event, data);
         }
     }
 
     info(component: string, event: string, data?: any): void {
-        if (this.shouldLog('info')) {
+        if (this.config.shouldLog('info')) {
             this.flushImmediate('info', component, event, data);
         }
     }
 
     warn(component: string, event: string, data?: any): void {
-        if (this.shouldLog('warning')) {
+        if (this.config.shouldLog('warning')) {
             this.flushImmediate('warning', component, event, data);
 
-            if (this.options.showNoticeOnWarning) {
-                const userMessage = this.formatUserMessage(component, event);
+            if (this.config.options.showNoticeOnWarning) {
+                const userMessage = this.config.formatUserMessage(component, event);
                 new Notice(`⚠️ ${userMessage}\nCheck console for details.`, 5000);
             }
         }
     }
 
     error(component: string, event: string, error: Error | any): void {
-        if (this.shouldLog('error')) {
+        if (this.config.shouldLog('error')) {
             this.flushImmediate('error', component, event, {
                 error: error instanceof Error ? error.message : error
             });
 
-            if (this.options.showNoticeOnError) {
-                const userMessage = this.formatUserMessage(component, event);
+            if (this.config.options.showNoticeOnError) {
+                const userMessage = this.config.formatUserMessage(component, event);
                 new Notice(`❌ ${userMessage}\nCheck console (Ctrl+Shift+I) for details.`, 7000);
             }
         }
     }
 
     // ========== Private Methods ==========
-
-    private shouldLog(level: LogCategory): boolean {
-        const levels: LogCategory[] = ['debug', 'info', 'warning', 'error'];
-        return levels.indexOf(level) >= levels.indexOf(this.logLevel);
-    }
 
     private flushImmediate(type: LogCategory, component: string, event: string, data?: any): void {
         const message = `${this.prefix} ${component} | ${event}`;
@@ -105,12 +121,6 @@ export class InstantLogger {
                 break;
         }
     }
-
-    private formatUserMessage(component: string, event: string): string {
-        const friendlyComponent = component.replace(/-/g, ' ').toLowerCase();
-        const friendlyEvent = event.replace(/_/g, ' ').toLowerCase();
-        return `${friendlyComponent}: ${friendlyEvent}`;
-    }
 }
 
 // ========== LogScope - Buffered Log Container ==========
@@ -125,7 +135,8 @@ export class LogScope {
 
     constructor(
         private readonly label: string,
-        readonly parent: LogScope | null = null
+        readonly parent: LogScope | null = null,
+        private readonly config?: LoggerConfig
     ) {}
 
     get level(): number {
@@ -191,9 +202,17 @@ export class LogScope {
         switch (entry.type) {
             case 'error':
                 console.error(message, data || '');
+                if (this.config?.options.showNoticeOnError) {
+                    const userMessage = this.config.formatUserMessage(entry.component, entry.event);
+                    new Notice(`❌ ${userMessage}\nCheck console (Ctrl+Shift+I) for details.`, 7000);
+                }
                 break;
             case 'warning':
                 console.warn(message, data || '');
+                if (this.config?.options.showNoticeOnWarning) {
+                    const userMessage = this.config.formatUserMessage(entry.component, entry.event);
+                    new Notice(`⚠️ ${userMessage}\nCheck console for details.`, 5000);
+                }
                 break;
             case 'info':
                 console.info(message, data || '');
@@ -214,24 +233,35 @@ export class LogScope {
  * Use for operations that benefit from grouped console output.
  */
 export class ScopedLogger {
-    constructor(private readonly scope: LogScope) {}
+    constructor(
+        private readonly scope: LogScope,
+        private readonly config: LoggerConfig
+    ) {}
 
     // ========== Logging Methods ==========
 
     debug(component: string, event: string, data?: any): void {
-        this.scope.addEntry('debug', component, event, data);
+        if (this.config.shouldLog('debug')) {
+            this.scope.addEntry('debug', component, event, data);
+        }
     }
 
     info(component: string, event: string, data?: any): void {
-        this.scope.addEntry('info', component, event, data);
+        if (this.config.shouldLog('info')) {
+            this.scope.addEntry('info', component, event, data);
+        }
     }
 
     warn(component: string, event: string, data?: any): void {
-        this.scope.addEntry('warning', component, event, data);
+        if (this.config.shouldLog('warning')) {
+            this.scope.addEntry('warning', component, event, data);
+        }
     }
 
     error(component: string, event: string, error: Error | any): void {
-        this.scope.addEntry('error', component, event, error);
+        if (this.config.shouldLog('error')) {
+            this.scope.addEntry('error', component, event, error);
+        }
     }
 
     // ========== Scope Management ==========
@@ -241,9 +271,9 @@ export class ScopedLogger {
      * The child scope is automatically added to the parent.
      */
     createNested(label: string): ScopedLogger {
-        const childScope = new LogScope(label, this.scope);
+        const childScope = new LogScope(label, this.scope, this.config);
         this.scope.addChildScope(childScope);
-        return new ScopedLogger(childScope);
+        return new ScopedLogger(childScope, this.config);
     }
 
     /**
@@ -276,39 +306,41 @@ export class ScopedLogger {
     }
 }
 
-// ========== LoggerFactory - Creates Logger Instances ==========
+// ========== Shared Logger Configuration ==========
 
 /**
- * LoggerFactory - Factory for creating logger instances.
- * Inject this into classes that need to create operation-specific loggers.
+ * Shared logger configuration instance used by all loggers.
+ * Ensures consistent behavior across InstantLogger and ScopedLogger.
  */
-export class LoggerFactory {
-    constructor(
-        private options: LoggerOptions = {}
-    ) {}
+export const loggerConfig = new LoggerConfig('debug', {
+    showNoticeOnError: true,
+    showNoticeOnWarning: false
+});
 
-    /**
-     * Create a root scoped logger for an operation
-     */
-    createScoped(label: string): ScopedLogger {
-        const rootScope = new LogScope(label, null);
-        return new ScopedLogger(rootScope);
-    }
 
-    /**
-     * Update log level for future logger instances and existing instant logger
-     */
-    setLogLevel(level: LogCategory): void {
-        logger.setLogLevel(level);
-    }
 
-    /**
-     * Update options for future logger instances and existing instant logger
-     */
-    setOptions(options: LoggerOptions): void {
-        this.options = { ...this.options, ...options };
-        logger.setOptions(options);
-    }
+// ========== Configuration Functions ==========
+
+/**
+ * Set the default log level for all loggers
+ */
+export function setDefaultLogLevel(level: LogCategory): void {
+    loggerConfig.setLogLevel(level);
+}
+
+/**
+ * Set the default logger options for all loggers
+ */
+export function setDefaultLoggerOptions(options: LoggerOptions): void {
+    loggerConfig.setOptions(options);
+}
+
+/**
+ * Create a scoped logger with the shared configuration
+ */
+export function createScopedLogger(label: string): ScopedLogger {
+    const rootScope = new LogScope(label, null, loggerConfig);
+    return new ScopedLogger(rootScope, loggerConfig);
 }
 
 // ========== Default Logger Instance ==========
@@ -317,9 +349,6 @@ export class LoggerFactory {
  * Default logger instance for direct import and use.
  * Eliminates need for dependency injection in simple cases.
  */
-export const logger = new InstantLogger('[TAGVERSE]', 'debug', {
-    showNoticeOnError: true,
-    showNoticeOnWarning: false
-});
+export const logger = new InstantLogger('[TAGVERSE]', loggerConfig);
 
 // ========================================

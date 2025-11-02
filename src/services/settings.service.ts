@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { logger, LoggerFactory, LogCategory } from '../utils/logger';
+import { logger, setDefaultLogLevel, setDefaultLoggerOptions, LogCategory } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -11,10 +11,7 @@ export class SettingsService implements ISettingsService {
     private settings: TagverseSettings;
     private changeCallbacks: Array<(settings: TagverseSettings) => void> = [];
 
-    constructor(
-        private plugin: Plugin,
-        private loggerFactory: LoggerFactory
-    ) {
+    constructor(private plugin: Plugin) {
         this.settings = { ...DEFAULT_SETTINGS };
     }
 
@@ -32,8 +29,8 @@ export class SettingsService implements ISettingsService {
         this.settings = settings;
         await this.plugin.saveData(settings);
 
-        // Update logger factory with new log level
-        this.loggerFactory.setLogLevel(settings.logLevel || 'debug');
+        // Update logger configuration
+        setDefaultLogLevel(settings.logLevel || 'debug');
 
         logger.info('SETTINGS', 'Settings saved', {
             mappingCount: settings.tagMappings.length,
@@ -51,8 +48,8 @@ export class SettingsService implements ISettingsService {
         const loadedData = await this.plugin.loadData();
         this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 
-        // Update logger factory with loaded log level
-        this.loggerFactory.setLogLevel(this.settings.logLevel || 'debug');
+        // Update logger configuration
+        setDefaultLogLevel(this.settings.logLevel || 'debug');
 
         logger.info('SETTINGS', 'Settings loaded', {
             mappingCount: this.settings.tagMappings.length,

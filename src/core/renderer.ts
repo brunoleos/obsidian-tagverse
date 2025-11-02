@@ -1,5 +1,5 @@
 import { Notice, App } from 'obsidian';
-import { logger } from '../utils/logger';
+import { logger, logWidgetLifecycle, logRenderPipeline, logScriptExecution } from '../utils/tagverse-logger';
 import { TagScriptMapping, ScriptContext } from '../types/interfaces';
 import { IScriptLoader } from '../services/interfaces';
 
@@ -18,7 +18,7 @@ export abstract class TagRenderer {
         protected mapping: TagScriptMapping,
         protected sourcePath: string
     ) {
-        logger.logWidgetLifecycle('TagRenderer created', {
+        logWidgetLifecycle('TagRenderer created', {
             tag: this.tag,
             script: this.mapping.scriptPath,
             source: this.sourcePath,
@@ -54,20 +54,20 @@ export abstract class TagRenderer {
 
     protected logScriptResult(result: any) {
         if (result instanceof HTMLElement) {
-            logger.logScriptExecution('Script returned HTMLElement', {
+            logScriptExecution('Script returned HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName,
                 hasContent: result.innerHTML.length > 0,
                 classes: result.className
             });
         } else if (typeof result === 'string') {
-            logger.logScriptExecution('Script returned string', {
+            logScriptExecution('Script returned string', {
                 tag: this.tag,
                 length: result.length,
                 preview: result.substring(0, 100)
             });
         } else {
-            logger.logScriptExecution('Script returned value', {
+            logScriptExecution('Script returned value', {
                 tag: this.tag,
                 type: typeof result,
                 isNull: result === null || result === undefined

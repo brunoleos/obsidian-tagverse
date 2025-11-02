@@ -1,5 +1,5 @@
 import { App, TFile } from 'obsidian';
-import { logger } from '../utils/logger';
+import { logger, logCacheOperation } from '../utils/tagverse-logger';
 import { IScriptLoader } from './interfaces';
 
 export class ScriptLoaderService implements IScriptLoader {
@@ -14,11 +14,11 @@ export class ScriptLoaderService implements IScriptLoader {
 
             // Check cache first
             if (this.scriptCache.has(scriptPath)) {
-                logger.logCacheOperation('Cache hit', { script: scriptPath });
+                logCacheOperation('Cache hit', { script: scriptPath });
                 return this.scriptCache.get(scriptPath)!;
             }
 
-            logger.logCacheOperation('Cache miss, loading from file', { script: scriptPath });
+            logCacheOperation('Cache miss, loading from file', { script: scriptPath });
 
             // Load the script file
             const file = app.vault.getAbstractFileByPath(scriptPath);
@@ -134,7 +134,7 @@ export class ScriptLoaderService implements IScriptLoader {
      */
     clearCache(): void {
         this.scriptCache.clear();
-        logger.logCacheOperation('Script cache cleared', { previousSize: this.scriptCache.size });
+        logCacheOperation('Script cache cleared', { previousSize: this.scriptCache.size });
     }
 
     /**

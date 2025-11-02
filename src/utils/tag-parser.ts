@@ -20,7 +20,7 @@ export class TagParser {
     static parseTag(tagString: string): ParsedTag {
         // Match pattern: #tagname or #tagname{...}
         const match = tagString.match(/^#([a-zA-Z0-9_-]+)(\{[\s\S]*\})?$/);
-        
+
         if (!match) {
             logger.debug('TAG_PARSER', 'Invalid tag format', { tagString });
             return {
@@ -62,7 +62,7 @@ export class TagParser {
         try {
             // Remove outer braces
             let content = argsString.slice(1, -1).trim();
-            
+
             if (!content) {
                 return {};
             }
@@ -73,17 +73,17 @@ export class TagParser {
 
             // Parse as JSON
             const parsed = JSON.parse(`{${content}}`);
-            
-            logger.debug('TAG_PARSER', 'Successfully parsed arguments', { 
-                original: argsString, 
-                parsed 
+
+            logger.debug('TAG_PARSER', 'Successfully parsed arguments', {
+                original: argsString,
+                parsed
             });
-            
+
             return parsed;
         } catch (error) {
-            logger.debug('TAG_PARSER', 'Failed to parse arguments, returning empty object', { 
-                argsString, 
-                error: error.message 
+            logger.debug('TAG_PARSER', 'Failed to parse arguments, returning empty object', {
+                argsString,
+                error: error.message
             });
             return {};
         }

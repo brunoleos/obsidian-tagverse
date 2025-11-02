@@ -121,7 +121,7 @@ export class CommunityScriptService implements ICommunityScriptService {
     }
 
     async installScript(scriptId: string): Promise<void> {
-        try {
+        return await logger.withGroup(`📦 Installing ${scriptId}`, async (group) => {
             const settings = this.getSettings();
 
             // Check if script already installed
@@ -180,15 +180,11 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             logger.info('COMMUNITY', 'Script installed successfully', { scriptId, version: scriptMeta.version });
             new Notice(`✅ Installed "${scriptMeta.name}"`);
-        } catch (error) {
-            logger.error('COMMUNITY', 'Failed to install script', { scriptId, error });
-            // Re-throw so UI can handle it
-            throw error;
-        }
+        });
     }
 
     async uninstallScript(scriptId: string): Promise<void> {
-        try {
+        return await logger.withGroup(`🗑️ Uninstalling ${scriptId}`, async (group) => {
             const settings = this.getSettings();
             const installed = settings.installedCommunityScripts.find(s => s.scriptId === scriptId);
 
@@ -223,10 +219,7 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             logger.info('COMMUNITY', 'Script uninstalled successfully', { scriptId });
             new Notice(`✅ Uninstalled script`);
-        } catch (error) {
-            logger.error('COMMUNITY', 'Failed to uninstall script', { scriptId, error });
-            throw error;
-        }
+        });
     }
 
     async checkForUpdates(): Promise<Map<string, string>> {
@@ -235,35 +228,34 @@ export class CommunityScriptService implements ICommunityScriptService {
         const updates = new Map<string, string>();
 
         if (settings.installedCommunityScripts.length > 0) {
-            logger.startLoopGroup('COMMUNITY', 'Checking for script updates', {
-                count: settings.installedCommunityScripts.length
-            });
-
-            settings.installedCommunityScripts.forEach(installed => {
-                const latest = registry.scripts.find(s => s.id === installed.scriptId);
-                if (latest && latest.version !== installed.version) {
-                    logger.logLoopIteration('COMMUNITY', 'Update available', {
-                        scriptId: installed.scriptId,
-                        currentVersion: installed.version,
-                        latestVersion: latest.version
-                    });
-                    updates.set(installed.scriptId, latest.version);
-                } else {
-                    logger.logLoopIteration('COMMUNITY', 'Script up to date', {
-                        scriptId: installed.scriptId,
-                        version: installed.version
+            await logger.withGroup(
+                `🔄 Checking updates for ${settings.installedCommunityScripts.length} scripts`,
+                async (group) => {
+                    settings.installedCommunityScripts.forEach(installed => {
+                        const latest = registry.scripts.find(s => s.id === installed.scriptId);
+                        if (latest && latest.version !== installed.version) {
+                            logger.debug('COMMUNITY', 'Update available', {
+                                scriptId: installed.scriptId,
+                                currentVersion: installed.version,
+                                latestVersion: latest.version
+                            });
+                            updates.set(installed.scriptId, latest.version);
+                        } else {
+                            logger.debug('COMMUNITY', 'Script up to date', {
+                                scriptId: installed.scriptId,
+                                version: installed.version
+                            });
+                        }
                     });
                 }
-            });
-
-            logger.endLoopGroup();
+            );
         }
 
         return updates;
     }
 
     async updateScript(scriptId: string): Promise<void> {
-        try {
+        return await logger.withGroup(`⬆️ Updating ${scriptId}`, async (group) => {
             const settings = this.getSettings();
             const installed = settings.installedCommunityScripts.find(s => s.scriptId === scriptId);
 
@@ -302,10 +294,7 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             logger.info('COMMUNITY', 'Script updated successfully', { scriptId, newVersion: scriptMeta.version });
             new Notice(`✅ Updated to v${scriptMeta.version}`);
-        } catch (error) {
-            logger.error('COMMUNITY', 'Failed to update script', { scriptId, error });
-            throw error;
-        }
+        });
     }
 
     getInstalledScripts(): InstalledCommunityScript[] {

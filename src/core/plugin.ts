@@ -3,7 +3,7 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { logger } from '../utils/logger';
+import { logger, logPluginInit, logUserAction } from '../utils/tagverse-logger';
 import { LivePreviewRenderer } from './live-preview-renderer';
 import { ReadingModeRenderer } from './reading-mode-renderer';
 import { TagverseSettingTab } from '../settings/settings-tab';
@@ -38,113 +38,121 @@ export default class TagversePlugin extends Plugin {
     }
 
     async onload() {
-        logger.logPluginInit('Plugin initialization started');
+        await logger.withGroup('🚀 Plugin Initialization', async (group) => {
+            logPluginInit('Plugin initialization started', undefined, group);
 
-        TagversePluginInstance = this;
+            TagversePluginInstance = this;
 
-        // Initialize services
-        this.initializeServices();
-        logger.logPluginInit('Services initialized');
+            // Initialize services
+            this.initializeServices();
+            logPluginInit('Services initialized', undefined, group);
 
-        // Load settings
-        await this.settingsService.loadSettings();
-        logger.logPluginInit('Settings loaded', {
-            refreshOnFileChange: this.settings.refreshOnFileChange,
-            logLevel: this.settings.logLevel
-        });
+            // Load settings
+            await this.settingsService.loadSettings();
+            logPluginInit('Settings loaded', {
+                refreshOnFileChange: this.settings.refreshOnFileChange,
+                logLevel: this.settings.logLevel
+            }, group);
 
-        // Initialize community script service
-        this.communityService = new CommunityScriptService(
-            this.app,
-            () => this.settings,
-            async (settings) => await this.saveSettings(settings)
-        );
-        logger.logPluginInit('Community script service initialized');
-
-        // Initialize tag mappings after settings are loaded
-        this.tagMapping.rebuildMappings(this.settings.tagMappings);
-
-        // Check for script updates on startup if enabled
-        if (this.settings.checkForUpdatesOnStartup) {
-            this.checkForScriptUpdates();
-        }
-
-        // Setup settings change handler
-        this.settingsService.onSettingsChanged((settings) => {
-            this.onSettingsChanged();
-        });
-
-        // Register markdown post processor for reading mode
-        this.registerMarkdownPostProcessor((element, context) => 
-            ReadingModeRenderer.processMarkdown(
-                this.tagMapping,
-                this.rendererFactory,
-                element,
-                context
-            )
-        );
-        logger.logPluginInit('Markdown post processor registered');
-
-        // Register live preview processor (source mode will show plain text)
-        this.registerEditorExtension(
-            LivePreviewRenderer.registerLivePreviewExtension(
+            // Initialize community script service
+            this.communityService = new CommunityScriptService(
                 this.app,
-                this.tagMapping,
-                this.rendererFactory
-            )
-        );
-        logger.logPluginInit('Live preview processor registered');
+                () => this.settings,
+                async (settings) => await this.saveSettings(settings)
+            );
+            logPluginInit('Community script service initialized', undefined, group);
 
-        // Register event for file changes if enabled
-        this.registerEvent(
-            this.app.workspace.on('file-open', (file) => {
-                if (this.settings.refreshOnFileChange) {
-                    this.refreshActiveView();
+            // Initialize tag mappings after settings are loaded
+            await this.tagMapping.rebuildMappings(this.settings.tagMappings);
+
+            // Check for script updates on startup if enabled (before registering callback to avoid duplicate rebuilds)
+            if (this.settings.checkForUpdatesOnStartup) {
+                await this.checkForScriptUpdates();
+            }
+
+            // Setup settings change handler (after initial update check to prevent duplicate callbacks)
+            this.settingsService.onSettingsChanged((settings) => {
+                this.onSettingsChanged();
+            });
+
+            // Register markdown post processor for reading mode
+            this.registerMarkdownPostProcessor((element, context) => {
+                // Only process when view is actually in reading/preview mode
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (!view || view.getMode() !== 'preview') {
+                    return; // Skip if not in reading mode
                 }
-            })
-        );
 
-        // Register event for layout changes to detect mode switches
-        this.registerEvent(
-            this.app.workspace.on('layout-change', () => {
-                this.checkForModeChange();
-            })
-        );
+                return ReadingModeRenderer.processMarkdown(
+                    this.tagMapping,
+                    this.rendererFactory,
+                    element,
+                    context
+                );
+            });
+            logPluginInit('Markdown post processor registered', undefined, group);
 
-        // Add settings tab
-        this.settingTab = new TagverseSettingTab(this.app, this);
-        this.addSettingTab(this.settingTab);
-        logger.logPluginInit('Settings tab added');
+            // Register live preview processor (source mode will show plain text)
+            this.registerEditorExtension(
+                LivePreviewRenderer.registerLivePreviewExtension(
+                    this.app,
+                    this.tagMapping,
+                    this.rendererFactory
+                )
+            );
+            logPluginInit('Live preview processor registered', undefined, group);
 
-        // Add command to refresh current view
-        this.addCommand({
-            id: 'refresh-dynamic-tags',
-            name: 'Refresh tagverses in current note',
-            callback: () => {
-                logger.logUserAction('Refresh tagverses command executed');
-                this.refreshActiveView();
-                new Notice('Tagverses refreshed');
-            }
+            // Register event for file changes if enabled
+            this.registerEvent(
+                this.app.workspace.on('file-open', (file) => {
+                    if (this.settings.refreshOnFileChange) {
+                        this.refreshActiveView();
+                    }
+                })
+            );
+
+            // Register event for layout changes to detect mode switches
+            this.registerEvent(
+                this.app.workspace.on('layout-change', () => {
+                    this.checkForModeChange();
+                })
+            );
+
+            // Add settings tab
+            this.settingTab = new TagverseSettingTab(this.app, this);
+            this.addSettingTab(this.settingTab);
+            logPluginInit('Settings tab added', undefined, group);
+
+            // Add command to refresh current view
+            this.addCommand({
+                id: 'refresh-dynamic-tags',
+                name: 'Refresh tagverses in current note',
+                callback: () => {
+                    logUserAction('Refresh tagverses command executed');
+                    this.refreshActiveView();
+                    new Notice('Tagverses refreshed');
+                }
+            });
+
+            // Add command to clear script cache
+            this.addCommand({
+                id: 'clear-script-cache',
+                name: 'Clear script cache',
+                callback: () => {
+                    logUserAction('Clear script cache command executed');
+                    this.scriptLoader.clearCache();
+                    new Notice('Script cache cleared');
+                }
+            });
+
+            logPluginInit('Plugin loaded successfully', undefined, group);
         });
-
-        // Add command to clear script cache
-        this.addCommand({
-            id: 'clear-script-cache',
-            name: 'Clear script cache',
-            callback: () => {
-                logger.logUserAction('Clear script cache command executed');
-                this.scriptLoader.clearCache();
-                new Notice('Script cache cleared');
-            }
-        });
-
-        logger.logPluginInit('Plugin loaded successfully');
     }
 
     onunload() {
         TagversePluginInstance = null;
         this.scriptLoader.clearCache();
-        logger.logPluginInit('Plugin unloaded successfully');
+        logPluginInit('Plugin unloaded successfully');
     }
 
     /**
@@ -170,17 +178,17 @@ export default class TagversePlugin extends Plugin {
      */
     private onSettingsChanged(): void {
         const settings = this.settings;
-        
+
         // Update tag mappings
         this.tagMapping.rebuildMappings(settings.tagMappings);
-        
+
         // Clear script cache when settings change
         this.scriptLoader.clearCache();
-        
+
         // Refresh active view
         this.refreshActiveView();
-        
-        logger.logPluginInit('Settings changed, services updated');
+
+        logPluginInit('Settings changed, services updated');
     }
 
     /**
@@ -193,7 +201,7 @@ export default class TagversePlugin extends Plugin {
 
             // Check if mode changed
             if (this.lastActiveViewMode !== null && this.lastActiveViewMode !== currentMode) {
-                logger.logPluginInit(`View mode changed from ${this.lastActiveViewMode} to ${currentMode}, refreshing`);
+                logPluginInit(`View mode changed from ${this.lastActiveViewMode} to ${currentMode}, refreshing`);
                 this.refreshActiveView();
             }
 
@@ -221,11 +229,11 @@ export default class TagversePlugin extends Plugin {
                             userEvent: "invalidate"
                         };
                         cm.dispatch(transactionSpec);
-                        logger.logPluginInit('Live preview decorations invalidated with forced update');
+                        logPluginInit('Live preview decorations invalidated with forced update');
                     }
                 } catch (error) {
                     // If not live preview or CodeMirror not accessible, ignore
-                    logger.logPluginInit('Could not invalidate live preview decorations', error);
+                    logPluginInit('Could not invalidate live preview decorations', error);
                 }
             }
         }

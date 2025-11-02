@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { logger } from '../utils/logger';
+import { logger, logPluginInit } from '../utils/tagverse-logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -29,9 +29,9 @@ export class SettingsService implements ISettingsService {
         this.settings = settings;
         await this.plugin.saveData(settings);
         logger.setLogLevel(settings.logLevel);
-        logger.logPluginInit('Settings saved', { 
+        logPluginInit('Settings saved', {
             mappingCount: settings.tagMappings.length,
-            logLevel: settings.logLevel 
+            logLevel: settings.logLevel
         });
 
         // Notify all registered callbacks
@@ -45,18 +45,18 @@ export class SettingsService implements ISettingsService {
         const loadedData = await this.plugin.loadData();
         this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
         logger.setLogLevel(this.settings.logLevel);
-        logger.logPluginInit('Settings loaded', { 
+        logPluginInit('Settings loaded', {
             mappingCount: this.settings.tagMappings.length,
             refreshOnFileChange: this.settings.refreshOnFileChange,
-            logLevel: this.settings.logLevel 
+            logLevel: this.settings.logLevel
         });
 
         this.settings.tagMappings.forEach((m, i) => {
-            logger.logPluginInit('Mapping configured', { 
-                index: i, 
-                tag: m.tag, 
-                script: m.scriptPath, 
-                enabled: m.enabled 
+            logPluginInit('Mapping configured', {
+                index: i,
+                tag: m.tag,
+                script: m.scriptPath,
+                enabled: m.enabled
             });
         });
     }
@@ -76,7 +76,7 @@ export class SettingsService implements ISettingsService {
             try {
                 callback(this.settings);
             } catch (error) {
-                logger.logErrorHandling('Settings change callback failed', error);
+                logger.error('ERROR-HANDLING', 'Settings change callback failed', error);
             }
         });
     }

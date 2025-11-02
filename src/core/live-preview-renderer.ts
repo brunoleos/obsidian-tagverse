@@ -1,7 +1,7 @@
 import { WidgetType, ViewPlugin } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
-import { logger } from '../utils/logger';
+import { logger, logWidgetLifecycle, logRenderPipeline } from '../utils/tagverse-logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { TagRenderer } from './renderer';
@@ -21,8 +21,6 @@ declare global {
  */
 export class LivePreviewRenderer extends TagRenderer {
     private _widgetType: TagverseWidgetType;
-    private groupId?: string;
-    private position?: number;
 
     constructor(
         scriptLoader: IScriptLoader,
@@ -31,14 +29,9 @@ export class LivePreviewRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         private frontmatter: any,
-        private args: any = {},
-        groupId?: string,
-        position?: number
+        private args: any = {}
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
-
-        this.groupId = groupId;
-        this.position = position;
 
         // Create container immediately
         this.container = createSpan({ cls: 'tagverse-widget-container' });
@@ -75,39 +68,35 @@ export class LivePreviewRenderer extends TagRenderer {
         if (this.rendered) return;
         this.rendered = true;
 
-        // Reopen the tag processing group for async rendering
-        if (this.groupId && this.position !== undefined) {
-            // Reconstruct and reopen the group
-            const groupId = logger.startTagProcessingGroup(this.tag, this.position, 'live-preview', {
-                phase: 'async-rendering'
-            });
-            this.groupId = groupId; // Update with actual groupId in case it was recreated
-        }
-
         // Show loading state initially
         this.container!.textContent = `Loading #${this.tag}...`;
 
-        try {
-            // Execute script and get result
-            const result = await this.executeScript(frontmatter, args);
+        await logger.withGroup(`🎨 Rendering #${this.tag}`, async (group) => {
+            try {
+                // Execute script and get result
+                const result = await this.executeScript(frontmatter, args);
 
-            // Process the result into an HTMLElement
-            const contentElement = this.processScriptResult(result);
+                // Process the result into an HTMLElement
+                const contentElement = this.processScriptResult(result);
 
-            // Update container with rendered content
-            this.container!.innerHTML = '';
-            this.container!.appendChild(contentElement);
-        } catch (error) {
-            // Handle error
-            const errorEl = this.handleError(error);
-            this.container!.innerHTML = '';
-            this.container!.appendChild(errorEl);
-        } finally {
-            // Close the tag processing group
-            if (this.groupId) {
-                logger.endTagProcessingGroup(this.groupId);
+                // Update container with rendered content
+                this.container!.innerHTML = '';
+                this.container!.appendChild(contentElement);
+
+                // Mark rendering as successful
+                logger.debug('RENDER-LIVE', 'Tag rendered successfully', {
+                    tag: this.tag
+                });
+            } catch (error) {
+                // Handle error
+                const errorEl = this.handleError(error);
+                this.container!.innerHTML = '';
+                this.container!.appendChild(errorEl);
+
+                // Log error
+                logger.error('RENDER-LIVE', 'Tag rendering failed', error);
             }
-        }
+        });
     }
 
     /**
@@ -116,7 +105,7 @@ export class LivePreviewRenderer extends TagRenderer {
     protected processScriptResult(result: any): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan({ text: `#${this.tag}` });
-            logger.logRenderPipeline('Output fallback to plain tag', {
+            logRenderPipeline('Output fallback to plain tag', {
                 tag: this.tag,
                 reason: 'null/undefined result'
             });
@@ -126,7 +115,7 @@ export class LivePreviewRenderer extends TagRenderer {
         if (typeof result === 'string') {
             const stringEl = createSpan();
             stringEl.innerHTML = result;
-            logger.logRenderPipeline('Output rendered as HTML string', {
+            logRenderPipeline('Output rendered as HTML string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -135,7 +124,7 @@ export class LivePreviewRenderer extends TagRenderer {
 
         if (result instanceof HTMLElement) {
             // Return directly, styling handled in render method on container
-            logger.logRenderPipeline('Output rendered directly as HTMLElement', {
+            logRenderPipeline('Output rendered directly as HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName
             });
@@ -183,8 +172,8 @@ export class LivePreviewRenderer extends TagRenderer {
 class TagverseWidgetType extends WidgetType {
     constructor(private renderer: LivePreviewRenderer) {
         super();
-        
-        logger.logWidgetLifecycle('Widget created', {
+
+        logWidgetLifecycle('Widget created', {
             tag: renderer['tag'],
             script: renderer['mapping'].scriptPath,
             source: renderer['sourcePath']
@@ -197,7 +186,7 @@ class TagverseWidgetType extends WidgetType {
         const scriptEq = other.renderer['mapping'].scriptPath === this.renderer['mapping'].scriptPath;
         const result = tagEq && sourceEq && scriptEq;
 
-        logger.logWidgetLifecycle('Widget eq check', {
+        logWidgetLifecycle('Widget eq check', {
             tag: this.renderer['tag'],
             tagEq,
             sourceEq,
@@ -211,7 +200,7 @@ class TagverseWidgetType extends WidgetType {
     }
 
     toDOM(): HTMLElement {
-        logger.logWidgetLifecycle('DOM requested', {
+        logWidgetLifecycle('DOM requested', {
             tag: this.renderer['tag'],
             rendered: this.renderer['rendered']
         });

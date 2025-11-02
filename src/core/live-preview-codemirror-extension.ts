@@ -31,13 +31,34 @@ export class LivePreviewCodeMirrorExtension {
 
         const livePreviewPlugin = ViewPlugin.fromClass(class {
             decorations: DecorationSet;
+            private needsInitialUpdate = true;
+            private justInitialized = false;
 
             constructor(view: EditorView) {
                 logger.debug('VIEWPLUGIN', 'Constructor', {});
-                this.decorations = this.shouldCreateDecorations(view) ? matchDecorator.createDeco(view) : Decoration.none;
+                // Defer initial decoration creation to first update to prevent duplicate processing
+                this.decorations = Decoration.none;
             }
 
             update(update: ViewUpdate) {
+                // Handle initial decoration creation on first update
+                if (this.needsInitialUpdate) {
+                    this.needsInitialUpdate = false;
+                    logger.debug('VIEWPLUGIN', 'Initial update - creating decorations', {});
+                    this.decorations = this.shouldCreateDecorations(update.view) ? matchDecorator.createDeco(update.view) : Decoration.none;
+
+                    // Debounce subsequent updates for 100ms to prevent rapid re-renders during initialization
+                    this.justInitialized = true;
+                    setTimeout(() => this.justInitialized = false, 100);
+                    return;
+                }
+
+                // Skip updates during debounce period
+                if (this.justInitialized) {
+                    logger.debug('VIEWPLUGIN', 'Skipping update - debounce period', {});
+                    return;
+                }
+
                 const reasons = {
                     docChanged: update.docChanged,
                     selectionChanged: update.startState.selection.main !== update.state.selection.main,
@@ -88,7 +109,7 @@ export class LivePreviewCodeMirrorExtension {
             decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {
                 const fullMatch = match[0];
 
-                // Extract tag name early (before full parsing) for group creation
+                // Extract tag name early for logging
                 const tagNameMatch = fullMatch.match(/^#([a-zA-Z0-9_-]+)/);
                 const tagName = tagNameMatch ? tagNameMatch[1] : 'unknown';
 
@@ -97,15 +118,16 @@ export class LivePreviewCodeMirrorExtension {
                 const isLivePreview = view.state.field(editorLivePreviewField as unknown as StateField<boolean>);
                 const cursorInside = cursor > pos - 1 && cursor < pos + tagLength + 1;
 
-                // Start tag processing group BEFORE parsing (so parser logs appear inside)
-                const groupId = logger.startTagProcessingGroup(tagName, pos, 'live-preview', {
-                    cursorInside
-                });
-
-                // Now parse (TAG_PARSER logs will appear inside the group)
+                // Parse tag (logs go to active context if any)
                 const parsed = TagParser.parseTag(fullMatch);
                 const tag = parsed.tag;
                 const args = parsed.args;
+
+                logger.debug('TAG', 'Tag parsed in live preview', {
+                    tag,
+                    pos,
+                    cursorInside
+                });
 
                 const context: MatchContext = {
                     tag,
@@ -113,19 +135,12 @@ export class LivePreviewCodeMirrorExtension {
                     isLivePreview: isLivePreview as boolean,
                     cursorInside,
                     position: pos,
-                    cursor,
-                    groupId  // Pass groupId through context
+                    cursor
                 };
 
                 let decoration = null;
-                try {
-                    if (this.tagMatchingService.shouldCreateWidget(context)) {
-                        decoration = this.tagMatchingService.createWidgetDecoration(tag, args, context);
-                    }
-                } finally {
-                    // End tag processing group
-                    // Note: For async rendering, the group will be reopened in the renderer
-                    logger.endTagProcessingGroup(groupId);
+                if (this.tagMatchingService.shouldCreateWidget(context)) {
+                    decoration = this.tagMatchingService.createWidgetDecoration(tag, args, context);
                 }
 
                 return decoration;

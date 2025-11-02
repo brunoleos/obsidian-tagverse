@@ -3,7 +3,7 @@ import { App } from 'obsidian';
 import { TagScriptMapping } from '../types/interfaces';
 import { ITagMappingProvider } from './interfaces';
 import { RendererFactoryService } from './renderer-factory.service';
-import { logger } from '../utils/logger';
+import { logger, LogGroup } from '../utils/logger';
 
 export interface MatchContext {
     tag: string;
@@ -12,7 +12,6 @@ export interface MatchContext {
     cursorInside: boolean;
     position: number;
     cursor: number;
-    groupId?: string; // Optional logging group ID for tag processing
 }
 
 /**
@@ -74,9 +73,7 @@ export class TagMatchingService {
             mapping,
             file?.path || '',
             frontmatter,
-            args,
-            context.groupId,  // Pass groupId for logging
-            context.position  // Pass position for logging
+            args
         );
 
         return Decoration.replace({

@@ -296,6 +296,8 @@ export class ScopedLogger {
  * Inject this into classes that need to create operation-specific loggers.
  */
 export class LoggerFactory {
+    private instantLogger: InstantLogger | null = null;
+
     constructor(
         private logLevel: LogLevel = 'debug',
         private options: LoggerOptions = {}
@@ -310,24 +312,33 @@ export class LoggerFactory {
     }
 
     /**
-     * Create an instant logger for immediate console output
+     * Create an instant logger for immediate console output (singleton)
      */
     createInstant(): InstantLogger {
-        return new InstantLogger('[TAGVERSE]', this.logLevel, this.options);
+        if (!this.instantLogger) {
+            this.instantLogger = new InstantLogger('[TAGVERSE]', this.logLevel, this.options);
+        }
+        return this.instantLogger;
     }
 
     /**
-     * Update log level for future logger instances
+     * Update log level for future logger instances and existing instant logger
      */
     setLogLevel(level: LogLevel): void {
         this.logLevel = level;
+        if (this.instantLogger) {
+            this.instantLogger.setLogLevel(level);
+        }
     }
 
     /**
-     * Update options for future logger instances
+     * Update options for future logger instances and existing instant logger
      */
     setOptions(options: LoggerOptions): void {
         this.options = { ...this.options, ...options };
+        if (this.instantLogger) {
+            this.instantLogger.setOptions(options);
+        }
     }
 }
 

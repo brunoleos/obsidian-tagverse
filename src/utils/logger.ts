@@ -1,5 +1,10 @@
-// ========== LOGGER UTILITY WITH STRICT SCOPED PATTERN ==========
+// ========== REFACTORED LOGGER SYSTEM WITH CONSTRUCTOR INJECTION ==========
 import { Notice } from 'obsidian';
+
+// ========== Types ==========
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogType = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LoggerOptions {
     showNoticeOnError?: boolean;
@@ -7,191 +12,85 @@ export interface LoggerOptions {
 }
 
 export interface LogEntry {
-    type: 'debug' | 'info' | 'warn' | 'error';
+    type: LogType;
     component: string;
     event: string;
     data?: any;
     timestamp: Date;
 }
 
-/**
- * LogGroup - Hierarchical container for buffered logs
- */
-export class LogGroup {
-    readonly id: string;
-    readonly label: string;
-    readonly level: number;
-    parent: LogGroup | null;
-    private entries: Array<LogEntry | LogGroup> = [];
-    readonly createdAt: Date;
-    flushedAt?: Date;
-
-    constructor(label: string, parent: LogGroup | null) {
-        this.id = `${label}:${Date.now()}:${Math.random()}`;
-        this.label = label;
-        this.parent = parent;
-        this.level = parent ? parent.level + 1 : 0;
-        this.createdAt = new Date();
-    }
-
-    /**
-     * Add a log entry to this group
-     */
-    addEntry(type: LogEntry['type'], component: string, event: string, data?: any): void {
-        const entry: LogEntry = {
-            type,
-            component,
-            event,
-            data,
-            timestamp: new Date()
-        };
-
-        this.entries.push(entry)
-    }
-
-    /**
-     * Create a nested group within this group
-     * Supports both sync and async functions
-     */
-    async withGroup<T>(label: string, fn: (group: LogGroup) => T | Promise<T>): Promise<T> {
-        const childGroup = new LogGroup(label, this);
-        this.entries.push(childGroup);
-
-        try {
-            const result = await fn(childGroup);
-            return result;
-        } finally {
-            childGroup.flush();
-        }
-    }
-
-    /**
-     * Flush this group and all children to console
-     */
-    flush(): void {
-
-        // Open console group
-        console.groupCollapsed(this.formatLabel());
-
-        try {
-            // Flush all entries in order
-            for (const entry of this.entries) {
-                try {
-                    if (this.isLogGroup(entry)) {
-                        entry.flush(); // Recursive flush
-                    } else {
-                        this.flushLogEntry(entry);
-                    }
-                } catch (err) {
-                    console.error('[Logger] Failed to flush entry:', err);
-                }
-            }         
-        } catch (err) {
-            console.error('[Logger] Critical flush failure:', err);
-        } 
-        
-        this.flushedAt = new Date();
-        console.groupEnd();
-    }
-
-    // ========== Private Helper Methods ==========
-    
-    private isLogGroup(entry: LogEntry | LogGroup): entry is LogGroup {
-        return entry instanceof LogGroup;
-    }
-
-    private formatLabel(): string {
-        const timestamp = this.createdAt.toISOString().split('T')[1];
-        return `[TAGVERSE] ${timestamp} | ${this.label}`;
-    }
-
-    private flushLogEntry(entry: LogEntry): void {
-        const timestamp = entry.timestamp.toISOString().split('T')[1];
-        const dataStr = entry.data ? ` | ${JSON.stringify(entry.data)}` : '';
-        const message = `[TAGVERSE] ${timestamp} | ${entry.component} | ${entry.event}${dataStr}`;
-
-        switch (entry.type) {
-            case 'debug':
-                console.log(message);
-                break;
-            case 'info':
-                console.info(message);
-                break;
-            case 'warn':
-                console.warn(message);
-                break;
-            case 'error':
-                console.error(message);
-                break;
-        }
-    }
-}
+// ========== InstantLogger - Immediate Console Logging ==========
 
 /**
- * Logger - Main logging class with strict scoped pattern
+ * InstantLogger - Logs immediately to console without buffering.
+ * Use for user-facing operations, services, and real-time feedback.
  */
-export class Logger {
-    private prefix = '[TAGVERSE]';
-    private logLevel: 'debug' | 'info' | 'warning' | 'error' = 'error';
-
-    private options: LoggerOptions = {
-        showNoticeOnError: true,
-        showNoticeOnWarning: false
-    };
+export class InstantLogger {
+    constructor(
+        private readonly prefix: string = '[TAGVERSE]',
+        private logLevel: LogLevel = 'debug',
+        private options: LoggerOptions = {}
+    ) {}
 
     // ========== Configuration ==========
 
-    setLogLevel(level: 'debug' | 'info' | 'warning' | 'error') {
+    setLogLevel(level: LogLevel): void {
         this.logLevel = level;
     }
 
-    setOptions(options: Partial<LoggerOptions>) {
+    setOptions(options: Partial<LoggerOptions>): void {
         this.options = { ...this.options, ...options };
-    }
-
-    // ========== Group Management ==========
-
-    /**
-     * Scoped logging pattern: creates group, passes it to function, auto-flushes
-     * For nested groups, use group.withGroup() instead
-     * Supports both sync and async functions
-     */
-    async withGroup<T>(label: string, fn: (group: LogGroup) => T | Promise<T>): Promise<T> {
-        const group = new LogGroup(label, null);
-
-        try {
-            const result = await fn(group);
-            return result;
-        } finally {
-            group.flush();        
-        }
     }
 
     // ========== Logging Methods ==========
 
-    private shouldLog(level: 'debug' | 'info' | 'warning' | 'error'): boolean {
-        const levels = ['debug', 'info', 'warning', 'error'];
+    debug(component: string, event: string, data?: any): void {
+        if (this.shouldLog('debug')) {
+            this.flushImmediate('debug', component, event, data);
+        }
+    }
+
+    info(component: string, event: string, data?: any): void {
+        if (this.shouldLog('info')) {
+            this.flushImmediate('info', component, event, data);
+        }
+    }
+
+    warn(component: string, event: string, data?: any): void {
+        if (this.shouldLog('warn')) {
+            this.flushImmediate('warn', component, event, data);
+
+            if (this.options.showNoticeOnWarning) {
+                const userMessage = this.formatUserMessage(component, event);
+                new Notice(`⚠️ ${userMessage}\nCheck console for details.`, 5000);
+            }
+        }
+    }
+
+    error(component: string, event: string, error: Error | any): void {
+        if (this.shouldLog('error')) {
+            this.flushImmediate('error', component, event, {
+                error: error instanceof Error ? error.message : error
+            });
+
+            if (this.options.showNoticeOnError) {
+                const userMessage = this.formatUserMessage(component, event);
+                new Notice(`❌ ${userMessage}\nCheck console (Ctrl+Shift+I) for details.`, 7000);
+            }
+        }
+    }
+
+    // ========== Private Methods ==========
+
+    private shouldLog(level: LogLevel): boolean {
+        const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
         return levels.indexOf(level) >= levels.indexOf(this.logLevel);
     }
 
-    private addEntry(type: LogEntry['type'], component: string, event: string, data?: any): void {
-        const entry: LogEntry = {
-            type,
-            component,
-            event,
-            data,
-            timestamp: new Date()
-        };
+    private flushImmediate(type: LogType, component: string, event: string, data?: any): void {
+        const message = `${this.prefix} ${component} | ${event}`;
 
-        this.flushLogEntryImmediate(entry);
-    }
-
-    private flushLogEntryImmediate(entry: LogEntry): void {
-        const prefix = `${this.prefix} ${entry.component}`;
-        const message = `${prefix} | ${entry.event}`;
-        const data = entry.data;
-
-        switch (entry.type) {
+        switch (type) {
             case 'error':
                 console.error(message, data || '');
                 break;
@@ -207,37 +106,6 @@ export class Logger {
                 break;
         }
     }
-
-    debug(component: string, event: string, data?: any) {
-        if (!this.shouldLog('debug')) return;
-        this.addEntry('debug', component, event, data);
-    }
-
-    info(component: string, event: string, data?: any) {
-        if (!this.shouldLog('info')) return;
-        this.addEntry('info', component, event, data);
-    }
-
-    warn(component: string, event: string, data?: any) {
-        if (!this.shouldLog('warning')) return;
-        this.addEntry('warn', component, event, data);
-
-        if (this.options.showNoticeOnWarning) {
-            const userMessage = this.formatUserMessage(component, event);
-            new Notice(`⚠️ ${userMessage}\nCheck console for details.`, 5000);
-        }
-    }
-
-    error(component: string, event: string, error: any) {
-        this.addEntry('error', component, event, { error: error.message || error });
-
-        if (this.options.showNoticeOnError) {
-            const userMessage = this.formatUserMessage(component, event);
-            new Notice(`❌ ${userMessage}\nCheck console (Ctrl+Shift+I) for details.`, 7000);
-        }
-    }
-
-    // ========== Private Helpers ==========
 
     private formatUserMessage(component: string, event: string): string {
         const componentMap: Record<string, string> = {
@@ -258,5 +126,209 @@ export class Logger {
     }
 }
 
-export const logger = new Logger();
+// ========== LogScope - Buffered Log Container ==========
+
+/**
+ * LogScope - Hierarchical container for buffered logs.
+ * Aggregates log entries and child scopes, flushes to console in tree structure.
+ */
+export class LogScope {
+    private entries: Array<LogEntry | LogScope> = [];
+    private readonly createdAt: Date = new Date();
+
+    constructor(
+        private readonly label: string,
+        readonly parent: LogScope | null = null
+    ) {}
+
+    get level(): number {
+        return this.parent ? this.parent.level + 1 : 0;
+    }
+
+    /**
+     * Add a log entry to this scope
+     */
+    addEntry(type: LogType, component: string, event: string, data?: any): void {
+        this.entries.push({
+            type,
+            component,
+            event,
+            data,
+            timestamp: new Date()
+        });
+    }
+
+    /**
+     * Add a child scope to this scope
+     */
+    addChildScope(childScope: LogScope): void {
+        this.entries.push(childScope);
+    }
+
+    /**
+     * Flush this scope and all children to console recursively
+     */
+    flush(): void {
+        console.groupCollapsed(this.formatLabel());
+
+        try {
+            for (const entry of this.entries) {
+                try {
+                    if (entry instanceof LogScope) {
+                        entry.flush(); // Recursive flush
+                    } else {
+                        this.flushLogEntry(entry);
+                    }
+                } catch (err) {
+                    console.error('[Logger] Failed to flush entry:', err);
+                }
+            }
+        } catch (err) {
+            console.error('[Logger] Critical flush failure:', err);
+        }
+
+        console.groupEnd();
+    }
+
+    // ========== Private Methods ==========
+
+    private formatLabel(): string {
+        const time = this.createdAt.toISOString().split('T')[1].slice(0, 12);
+        return `[TAGVERSE] ${time} | ${this.label}`;
+    }
+
+    private flushLogEntry(entry: LogEntry): void {
+        const message = `${entry.component} | ${entry.event}`;
+        const data = entry.data;
+
+        switch (entry.type) {
+            case 'error':
+                console.error(message, data || '');
+                break;
+            case 'warn':
+                console.warn(message, data || '');
+                break;
+            case 'info':
+                console.info(message, data || '');
+                break;
+            case 'debug':
+            default:
+                console.log(message, data || '');
+                break;
+        }
+    }
+}
+
+// ========== ScopedLogger - Buffered Logger with Auto-Flush ==========
+
+/**
+ * ScopedLogger - Buffered logger that aggregates logs into hierarchical scopes.
+ * Logs are buffered and flushed at the end of the root scope.
+ * Use for operations that benefit from grouped console output.
+ */
+export class ScopedLogger {
+    constructor(private readonly scope: LogScope) {}
+
+    // ========== Logging Methods ==========
+
+    debug(component: string, event: string, data?: any): void {
+        this.scope.addEntry('debug', component, event, data);
+    }
+
+    info(component: string, event: string, data?: any): void {
+        this.scope.addEntry('info', component, event, data);
+    }
+
+    warn(component: string, event: string, data?: any): void {
+        this.scope.addEntry('warn', component, event, data);
+    }
+
+    error(component: string, event: string, error: Error | any): void {
+        this.scope.addEntry('error', component, event, error);
+    }
+
+    // ========== Scope Management ==========
+
+    /**
+     * Create a nested logger with a child scope.
+     * The child scope is automatically added to the parent.
+     */
+    createNested(label: string): ScopedLogger {
+        const childScope = new LogScope(label, this.scope);
+        this.scope.addChildScope(childScope);
+        return new ScopedLogger(childScope);
+    }
+
+    /**
+     * Execute a function with a nested scope.
+     * Auto-flushes if this is the root scope.
+     */
+    async withScope<T>(
+        label: string,
+        fn: (logger: ScopedLogger) => T | Promise<T>
+    ): Promise<T> {
+        const nestedLogger = this.createNested(label);
+
+        try {
+            return await fn(nestedLogger);
+        } finally {
+            // Auto-flush only if root scope (no parent)
+            if (!this.scope.parent) {
+                this.scope.flush();
+            }
+        }
+    }
+
+    /**
+     * Manually flush this logger's scope (only for root loggers)
+     */
+    flush(): void {
+        if (!this.scope.parent) {
+            this.scope.flush();
+        }
+    }
+}
+
+// ========== LoggerFactory - Creates Logger Instances ==========
+
+/**
+ * LoggerFactory - Factory for creating logger instances.
+ * Inject this into classes that need to create operation-specific loggers.
+ */
+export class LoggerFactory {
+    constructor(
+        private logLevel: LogLevel = 'debug',
+        private options: LoggerOptions = {}
+    ) {}
+
+    /**
+     * Create a root scoped logger for an operation
+     */
+    createScoped(label: string): ScopedLogger {
+        const rootScope = new LogScope(label, null);
+        return new ScopedLogger(rootScope);
+    }
+
+    /**
+     * Create an instant logger for immediate console output
+     */
+    createInstant(): InstantLogger {
+        return new InstantLogger('[TAGVERSE]', this.logLevel, this.options);
+    }
+
+    /**
+     * Update log level for future logger instances
+     */
+    setLogLevel(level: LogLevel): void {
+        this.logLevel = level;
+    }
+
+    /**
+     * Update options for future logger instances
+     */
+    setOptions(options: LoggerOptions): void {
+        this.options = { ...this.options, ...options };
+    }
+}
+
 // ========================================

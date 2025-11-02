@@ -3,6 +3,7 @@ import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader } from './interfaces';
 import { LivePreviewRenderer } from '../core/live-preview-renderer';
 import { ReadingModeRenderer } from '../core/reading-mode-renderer';
+import { LoggerFactory } from '../utils/logger';
 
 /**
  * Factory service for creating renderer instances.
@@ -12,7 +13,8 @@ import { ReadingModeRenderer } from '../core/reading-mode-renderer';
 export class RendererFactoryService {
     constructor(
         private scriptLoader: IScriptLoader,
-        private app: App
+        private app: App,
+        private loggerFactory: LoggerFactory
     ) {}
 
     /**
@@ -25,6 +27,9 @@ export class RendererFactoryService {
         frontmatter: any,
         args: any = {}
     ): LivePreviewRenderer {
+        // Create operation-specific scoped logger
+        const logger = this.loggerFactory.createScoped(`🎨 Rendering #${tag}`);
+
         return new LivePreviewRenderer(
             this.scriptLoader,
             this.app,
@@ -32,7 +37,8 @@ export class RendererFactoryService {
             mapping,
             sourcePath,
             frontmatter,
-            args
+            args,
+            logger
         );
     }
 
@@ -44,8 +50,17 @@ export class RendererFactoryService {
         mapping: TagScriptMapping,
         sourcePath: string,
         targetElement: HTMLElement,
-        args: any = {}
+        args: any = {},
+        groupId?: string,
+        position?: number
     ): ReadingModeRenderer {
+        // Create operation-specific scoped logger with position info
+        const label = position !== undefined
+            ? `📖 Processing #${tag} at pos:${position}`
+            : `📖 Processing #${tag}`;
+
+        const logger = this.loggerFactory.createScoped(label);
+
         return new ReadingModeRenderer(
             this.scriptLoader,
             this.app,
@@ -53,7 +68,8 @@ export class RendererFactoryService {
             mapping,
             sourcePath,
             targetElement,
-            args
+            args,
+            logger
         );
     }
 }

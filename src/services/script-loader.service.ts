@@ -1,9 +1,11 @@
 import { App, TFile } from 'obsidian';
-import { logger, logCacheOperation } from '../utils/tagverse-logger';
+import { InstantLogger } from '../utils/logger';
 import { IScriptLoader } from './interfaces';
 
 export class ScriptLoaderService implements IScriptLoader {
     private scriptCache: Map<string, Function> = new Map();
+
+    constructor(private logger: InstantLogger) {}
 
     async loadScript(scriptPath: string, app: App): Promise<Function> {
         try {
@@ -14,23 +16,23 @@ export class ScriptLoaderService implements IScriptLoader {
 
             // Check cache first
             if (this.scriptCache.has(scriptPath)) {
-                logCacheOperation('Cache hit', { script: scriptPath });
+                this.logger.debug('CACHE', 'Cache hit', { script: scriptPath });
                 return this.scriptCache.get(scriptPath)!;
             }
 
-            logCacheOperation('Cache miss, loading from file', { script: scriptPath });
+            this.logger.debug('CACHE', 'Cache miss, loading from file', { script: scriptPath });
 
             // Load the script file
             const file = app.vault.getAbstractFileByPath(scriptPath);
 
             if (!file || !(file instanceof TFile)) {
-                logger.error('SCRIPT-LOADER', 'Script file not found', { script: scriptPath, fileType: typeof file });
+                this.logger.error('SCRIPT-LOADER', 'Script file not found', { script: scriptPath, fileType: typeof file });
                 throw new Error(`Script file not found or not a file: ${scriptPath}`);
             }
 
             try {
                 const scriptContent = await app.vault.read(file);
-                logger.debug('SCRIPT-LOADER', 'Script file read successfully', { script: scriptPath, contentLength: scriptContent.length });
+                this.logger.debug('SCRIPT-LOADER', 'Script file read successfully', { script: scriptPath, contentLength: scriptContent.length });
 
                 // Wrap in async function to support await
                 const wrappedScript = `
@@ -48,19 +50,19 @@ export class ScriptLoaderService implements IScriptLoader {
                 `;
 
                 const scriptFunction = new Function(wrappedScript)();
-                logger.debug('SCRIPT-LOADER', 'Script function created', { script: scriptPath });
+                this.logger.debug('SCRIPT-LOADER', 'Script function created', { script: scriptPath });
 
                 // Cache the function
                 this.scriptCache.set(scriptPath, scriptFunction);
-                logger.debug('SCRIPT-LOADER', 'Script cached', { script: scriptPath });
+                this.logger.debug('SCRIPT-LOADER', 'Script cached', { script: scriptPath });
 
                 return scriptFunction;
             } catch (error) {
-                logger.error('SCRIPT-LOADER', 'Failed to read or parse script file', { scriptPath, error });
+                this.logger.error('SCRIPT-LOADER', 'Failed to read or parse script file', { scriptPath, error });
                 throw new Error(`Failed to load script "${scriptPath}": ${error.message}`);
             }
         } catch (error) {
-            logger.error('SCRIPT-LOADER', 'Script loading failed', { scriptPath, error });
+            this.logger.error('SCRIPT-LOADER', 'Script loading failed', { scriptPath, error });
             throw error;
         }
     }
@@ -75,11 +77,11 @@ export class ScriptLoaderService implements IScriptLoader {
         try {
             // Check cache
             if (this.scriptCache.has(cacheKey)) {
-                logger.debug('SCRIPT-LOADER', 'Cache hit (community)', { scriptId });
+                this.logger.debug('SCRIPT-LOADER', 'Cache hit (community)', { scriptId });
                 return this.scriptCache.get(cacheKey)!;
             }
 
-            logger.debug('SCRIPT-LOADER', 'Loading community script', { scriptId });
+            this.logger.debug('SCRIPT-LOADER', 'Loading community script', { scriptId });
 
             // Read from plugin data folder
             const localPath = `community-scripts/${scriptId}.js`;
@@ -89,9 +91,9 @@ export class ScriptLoaderService implements IScriptLoader {
             let scriptContent: string;
             try {
                 scriptContent = await adapter.read(fullPath);
-                logger.debug('SCRIPT-LOADER', 'Community script file read', { scriptId, fullPath, contentLength: scriptContent.length });
+                this.logger.debug('SCRIPT-LOADER', 'Community script file read', { scriptId, fullPath, contentLength: scriptContent.length });
             } catch (error) {
-                logger.error('SCRIPT-LOADER', 'Failed to read community script file', { scriptId, fullPath, error });
+                this.logger.error('SCRIPT-LOADER', 'Failed to read community script file', { scriptId, fullPath, error });
                 throw new Error(`Failed to read community script file "${scriptId}": ${error.message}`);
             }
 
@@ -112,19 +114,19 @@ export class ScriptLoaderService implements IScriptLoader {
                 `;
 
                 const scriptFunction = new Function(wrappedScript)();
-                logger.debug('SCRIPT-LOADER', 'Community script function created', { scriptId });
+                this.logger.debug('SCRIPT-LOADER', 'Community script function created', { scriptId });
 
                 // Cache the function
                 this.scriptCache.set(cacheKey, scriptFunction);
-                logger.debug('SCRIPT-LOADER', 'Community script cached', { scriptId });
+                this.logger.debug('SCRIPT-LOADER', 'Community script cached', { scriptId });
 
                 return scriptFunction;
             } catch (error) {
-                logger.error('SCRIPT-LOADER', 'Failed to parse community script', { scriptId, error });
+                this.logger.error('SCRIPT-LOADER', 'Failed to parse community script', { scriptId, error });
                 throw new Error(`Failed to parse community script "${scriptId}": ${error.message}`);
             }
         } catch (error) {
-            logger.error('SCRIPT-LOADER', 'Failed to load community script', { scriptId, error });
+            this.logger.error('SCRIPT-LOADER', 'Failed to load community script', { scriptId, error });
             throw error;
         }
     }
@@ -133,8 +135,9 @@ export class ScriptLoaderService implements IScriptLoader {
      * Clear the script cache
      */
     clearCache(): void {
+        const previousSize = this.scriptCache.size;
         this.scriptCache.clear();
-        logCacheOperation('Script cache cleared', { previousSize: this.scriptCache.size });
+        this.logger.debug('CACHE', 'Script cache cleared', { previousSize });
     }
 
     /**

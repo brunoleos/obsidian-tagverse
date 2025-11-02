@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { logger, logPluginInit } from '../utils/tagverse-logger';
+import { InstantLogger, LoggerFactory } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -11,7 +11,11 @@ export class SettingsService implements ISettingsService {
     private settings: TagverseSettings;
     private changeCallbacks: Array<(settings: TagverseSettings) => void> = [];
 
-    constructor(private plugin: Plugin) {
+    constructor(
+        private plugin: Plugin,
+        private logger: InstantLogger,
+        private loggerFactory: LoggerFactory
+    ) {
         this.settings = { ...DEFAULT_SETTINGS };
     }
 
@@ -28,8 +32,12 @@ export class SettingsService implements ISettingsService {
     async saveSettings(settings: TagverseSettings): Promise<void> {
         this.settings = settings;
         await this.plugin.saveData(settings);
-        logger.setLogLevel(settings.logLevel);
-        logPluginInit('Settings saved', {
+
+        // Update logger factory with new log level
+        const logLevel = settings.logLevel === 'warning' ? 'warn' : (settings.logLevel || 'debug');
+        this.loggerFactory.setLogLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
+
+        this.logger.info('SETTINGS', 'Settings saved', {
             mappingCount: settings.tagMappings.length,
             logLevel: settings.logLevel
         });
@@ -44,15 +52,19 @@ export class SettingsService implements ISettingsService {
     async loadSettings(): Promise<void> {
         const loadedData = await this.plugin.loadData();
         this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-        logger.setLogLevel(this.settings.logLevel);
-        logPluginInit('Settings loaded', {
+
+        // Update logger factory with loaded log level
+        const logLevel = this.settings.logLevel === 'warning' ? 'warn' : (this.settings.logLevel || 'debug');
+        this.loggerFactory.setLogLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
+
+        this.logger.info('SETTINGS', 'Settings loaded', {
             mappingCount: this.settings.tagMappings.length,
             refreshOnFileChange: this.settings.refreshOnFileChange,
             logLevel: this.settings.logLevel
         });
 
         this.settings.tagMappings.forEach((m, i) => {
-            logPluginInit('Mapping configured', {
+            this.logger.debug('SETTINGS', 'Mapping configured', {
                 index: i,
                 tag: m.tag,
                 script: m.scriptPath,
@@ -76,7 +88,7 @@ export class SettingsService implements ISettingsService {
             try {
                 callback(this.settings);
             } catch (error) {
-                logger.error('ERROR-HANDLING', 'Settings change callback failed', error);
+                this.logger.error('ERROR-HANDLING', 'Settings change callback failed', error as Error);
             }
         });
     }

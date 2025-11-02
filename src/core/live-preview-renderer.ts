@@ -1,7 +1,7 @@
 import { WidgetType, ViewPlugin } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
-import { logger, logWidgetLifecycle, logRenderPipeline } from '../utils/tagverse-logger';
+import { ScopedLogger, LoggerFactory } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { TagRenderer } from './renderer';
@@ -29,15 +29,16 @@ export class LivePreviewRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         private frontmatter: any,
-        private args: any = {}
+        private args: any = {},
+        logger: ScopedLogger
     ) {
-        super(scriptLoader, app, tag, mapping, sourcePath);
+        super(scriptLoader, app, tag, mapping, sourcePath, logger);
 
         // Create container immediately
         this.container = createSpan({ cls: 'tagverse-widget-container' });
 
         // Create widget type wrapper
-        this._widgetType = new TagverseWidgetType(this);
+        this._widgetType = new TagverseWidgetType(this, logger);
 
         // Start async loading
         this.render(frontmatter, args);
@@ -71,32 +72,33 @@ export class LivePreviewRenderer extends TagRenderer {
         // Show loading state initially
         this.container!.textContent = `Loading #${this.tag}...`;
 
-        await logger.withGroup(`🎨 Rendering #${this.tag}`, async (group) => {
-            try {
-                // Execute script and get result
-                const result = await this.executeScript(frontmatter, args);
+        try {
+            // Execute script and get result
+            const result = await this.executeScript(frontmatter, args);
 
-                // Process the result into an HTMLElement
-                const contentElement = this.processScriptResult(result);
+            // Process the result into an HTMLElement
+            const contentElement = this.processScriptResult(result);
 
-                // Update container with rendered content
-                this.container!.innerHTML = '';
-                this.container!.appendChild(contentElement);
+            // Update container with rendered content
+            this.container!.innerHTML = '';
+            this.container!.appendChild(contentElement);
 
-                // Mark rendering as successful
-                logger.debug('RENDER-LIVE', 'Tag rendered successfully', {
-                    tag: this.tag
-                });
-            } catch (error) {
-                // Handle error
-                const errorEl = this.handleError(error);
-                this.container!.innerHTML = '';
-                this.container!.appendChild(errorEl);
+            // Mark rendering as successful
+            this.logger.info('RENDER-LIVE', 'Tag rendered successfully', {
+                tag: this.tag
+            });
+        } catch (error) {
+            // Handle error
+            const errorEl = this.handleError(error as Error);
+            this.container!.innerHTML = '';
+            this.container!.appendChild(errorEl);
 
-                // Log error
-                logger.error('RENDER-LIVE', 'Tag rendering failed', error);
-            }
-        });
+            // Log error
+            this.logger.error('RENDER-LIVE', 'Tag rendering failed', error as Error);
+        } finally {
+            // Auto-flush root scope
+            this.logger.flush();
+        }
     }
 
     /**
@@ -105,7 +107,7 @@ export class LivePreviewRenderer extends TagRenderer {
     protected processScriptResult(result: any): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan({ text: `#${this.tag}` });
-            logRenderPipeline('Output fallback to plain tag', {
+            this.logger.debug('RENDER-PIPELINE', 'Output fallback to plain tag', {
                 tag: this.tag,
                 reason: 'null/undefined result'
             });
@@ -115,7 +117,7 @@ export class LivePreviewRenderer extends TagRenderer {
         if (typeof result === 'string') {
             const stringEl = createSpan();
             stringEl.innerHTML = result;
-            logRenderPipeline('Output rendered as HTML string', {
+            this.logger.debug('RENDER-PIPELINE', 'Output rendered as HTML string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -124,7 +126,7 @@ export class LivePreviewRenderer extends TagRenderer {
 
         if (result instanceof HTMLElement) {
             // Return directly, styling handled in render method on container
-            logRenderPipeline('Output rendered directly as HTMLElement', {
+            this.logger.debug('RENDER-PIPELINE', 'Output rendered directly as HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName
             });
@@ -136,7 +138,7 @@ export class LivePreviewRenderer extends TagRenderer {
             cls: 'tagverse-error',
             text: `[Invalid output for #${this.tag}]`
         });
-        logger.warn('RENDER-LIVE', 'Invalid output type', {
+        this.logger.warn('RENDER-LIVE', 'Invalid output type', {
             tag: this.tag,
             type: typeof result
         });
@@ -149,10 +151,12 @@ export class LivePreviewRenderer extends TagRenderer {
     static registerLivePreviewExtension(
         app: App,
         tagMapping: ITagMappingProvider,
-        rendererFactory: RendererFactoryService
+        rendererFactory: RendererFactoryService,
+        loggerFactory: LoggerFactory
     ): [ViewPlugin<any>, StateField<number>] {
-        const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app);
-        const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app);
+        const instantLogger = loggerFactory.createInstant();
+        const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app, instantLogger);
+        const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app, instantLogger);
         return extension.createExtension();
     }
 
@@ -170,10 +174,13 @@ export class LivePreviewRenderer extends TagRenderer {
  * Delegates all logic to LivePreviewRenderer.
  */
 class TagverseWidgetType extends WidgetType {
-    constructor(private renderer: LivePreviewRenderer) {
+    constructor(
+        private renderer: LivePreviewRenderer,
+        private logger: ScopedLogger
+    ) {
         super();
 
-        logWidgetLifecycle('Widget created', {
+        this.logger.debug('WIDGET', 'Widget created', {
             tag: renderer['tag'],
             script: renderer['mapping'].scriptPath,
             source: renderer['sourcePath']
@@ -186,7 +193,7 @@ class TagverseWidgetType extends WidgetType {
         const scriptEq = other.renderer['mapping'].scriptPath === this.renderer['mapping'].scriptPath;
         const result = tagEq && sourceEq && scriptEq;
 
-        logWidgetLifecycle('Widget eq check', {
+        this.logger.debug('WIDGET', 'Widget eq check', {
             tag: this.renderer['tag'],
             tagEq,
             sourceEq,
@@ -200,7 +207,7 @@ class TagverseWidgetType extends WidgetType {
     }
 
     toDOM(): HTMLElement {
-        logWidgetLifecycle('DOM requested', {
+        this.logger.debug('WIDGET', 'DOM requested', {
             tag: this.renderer['tag'],
             rendered: this.renderer['rendered']
         });

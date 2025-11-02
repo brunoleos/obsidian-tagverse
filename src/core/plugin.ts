@@ -3,7 +3,7 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { logger, logPluginInit, logUserAction } from '../utils/tagverse-logger';
+import { LoggerFactory, ScopedLogger } from '../utils/logger';
 import { LivePreviewRenderer } from './live-preview-renderer';
 import { ReadingModeRenderer } from './reading-mode-renderer';
 import { TagverseSettingTab } from '../settings/settings-tab';
@@ -13,7 +13,9 @@ import { TagMappingService } from '../services/tag-mapping.service';
 import { SettingsService } from '../services/settings.service';
 import { RendererFactoryService } from '../services/renderer-factory.service';
 import { CommunityScriptService } from '../services/community-script.service';
+import { TagMatchingService } from '../services/tag-matching.service';
 import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../services/interfaces';
+import { TagParser } from '../utils/tag-parser';
 
 export let TagversePluginInstance: TagversePlugin | null = null;
 
@@ -22,6 +24,7 @@ export let TagversePluginInstance: TagversePlugin | null = null;
  */
 export default class TagversePlugin extends Plugin {
     // Service instances (dependency injection)
+    private loggerFactory: LoggerFactory;
     private scriptLoader: IScriptLoader;
     private tagMapping: ITagMappingProvider;
     private settingsService: ISettingsService;
@@ -38,29 +41,44 @@ export default class TagversePlugin extends Plugin {
     }
 
     async onload() {
-        await logger.withGroup('🚀 Plugin Initialization', async (group) => {
-            logPluginInit('Plugin initialization started', undefined, group);
+        // Create logger factory first
+        this.loggerFactory = new LoggerFactory('debug', {
+            showNoticeOnError: true,
+            showNoticeOnWarning: false
+        });
+
+        // Create scoped logger for initialization
+        const initLogger = this.loggerFactory.createScoped('🚀 Plugin Initialization');
+
+        try {
+            initLogger.info('PLUGIN-INIT', 'Plugin initialization started');
 
             TagversePluginInstance = this;
 
             // Initialize services
             this.initializeServices();
-            logPluginInit('Services initialized', undefined, group);
+            initLogger.info('PLUGIN-INIT', 'Services initialized');
 
             // Load settings
             await this.settingsService.loadSettings();
-            logPluginInit('Settings loaded', {
+            initLogger.info('PLUGIN-INIT', 'Settings loaded', {
                 refreshOnFileChange: this.settings.refreshOnFileChange,
                 logLevel: this.settings.logLevel
-            }, group);
+            });
+
+            // Update logger factory with settings
+            const logLevel = this.settings.logLevel === 'warning' ? 'warn' : (this.settings.logLevel || 'debug');
+            this.loggerFactory.setLogLevel(logLevel as 'debug' | 'info' | 'warn' | 'error');
 
             // Initialize community script service
+            const communityLogger = this.loggerFactory.createScoped('Community Scripts');
             this.communityService = new CommunityScriptService(
                 this.app,
                 () => this.settings,
-                async (settings) => await this.saveSettings(settings)
+                async (settings) => await this.saveSettings(settings),
+                communityLogger
             );
-            logPluginInit('Community script service initialized', undefined, group);
+            initLogger.info('PLUGIN-INIT', 'Community script service initialized');
 
             // Initialize tag mappings after settings are loaded
             await this.tagMapping.rebuildMappings(this.settings.tagMappings);
@@ -90,17 +108,18 @@ export default class TagversePlugin extends Plugin {
                     context
                 );
             });
-            logPluginInit('Markdown post processor registered', undefined, group);
+            initLogger.info('PLUGIN-INIT', 'Markdown post processor registered');
 
             // Register live preview processor (source mode will show plain text)
             this.registerEditorExtension(
                 LivePreviewRenderer.registerLivePreviewExtension(
                     this.app,
                     this.tagMapping,
-                    this.rendererFactory
+                    this.rendererFactory,
+                    this.loggerFactory
                 )
             );
-            logPluginInit('Live preview processor registered', undefined, group);
+            initLogger.info('PLUGIN-INIT', 'Live preview processor registered');
 
             // Register event for file changes if enabled
             this.registerEvent(
@@ -121,14 +140,13 @@ export default class TagversePlugin extends Plugin {
             // Add settings tab
             this.settingTab = new TagverseSettingTab(this.app, this);
             this.addSettingTab(this.settingTab);
-            logPluginInit('Settings tab added', undefined, group);
+            initLogger.info('PLUGIN-INIT', 'Settings tab added');
 
             // Add command to refresh current view
             this.addCommand({
                 id: 'refresh-dynamic-tags',
                 name: 'Refresh tagverses in current note',
                 callback: () => {
-                    logUserAction('Refresh tagverses command executed');
                     this.refreshActiveView();
                     new Notice('Tagverses refreshed');
                 }
@@ -139,31 +157,46 @@ export default class TagversePlugin extends Plugin {
                 id: 'clear-script-cache',
                 name: 'Clear script cache',
                 callback: () => {
-                    logUserAction('Clear script cache command executed');
                     this.scriptLoader.clearCache();
                     new Notice('Script cache cleared');
                 }
             });
 
-            logPluginInit('Plugin loaded successfully', undefined, group);
-        });
+            initLogger.info('PLUGIN-INIT', 'Plugin loaded successfully');
+        } catch (error) {
+            initLogger.error('PLUGIN-INIT', 'Plugin initialization failed', error as Error);
+            throw error;
+        } finally {
+            // Flush initialization logs
+            initLogger.flush();
+        }
     }
 
     onunload() {
         TagversePluginInstance = null;
         this.scriptLoader.clearCache();
-        logPluginInit('Plugin unloaded successfully');
     }
 
     /**
      * Initialize all services with proper dependency injection
      */
     private initializeServices(): void {
+        // Create logger instances for services
+        const instantLogger = this.loggerFactory.createInstant();
+        const tagMappingLogger = this.loggerFactory.createScoped('Tag Mapping');
+
+        // Setup static logger for TagParser
+        TagParser.setLogger(instantLogger);
+
         // Create service instances
-        this.scriptLoader = new ScriptLoaderService();
-        this.tagMapping = new TagMappingService();
-        this.settingsService = new SettingsService(this);
-        this.rendererFactory = new RendererFactoryService(this.scriptLoader, this.app);
+        this.scriptLoader = new ScriptLoaderService(instantLogger);
+        this.tagMapping = new TagMappingService(tagMappingLogger);
+        this.settingsService = new SettingsService(this, instantLogger, this.loggerFactory);
+        this.rendererFactory = new RendererFactoryService(
+            this.scriptLoader,
+            this.app,
+            this.loggerFactory
+        );
     }
 
     /**
@@ -187,8 +220,6 @@ export default class TagversePlugin extends Plugin {
 
         // Refresh active view
         this.refreshActiveView();
-
-        logPluginInit('Settings changed, services updated');
     }
 
     /**
@@ -201,7 +232,6 @@ export default class TagversePlugin extends Plugin {
 
             // Check if mode changed
             if (this.lastActiveViewMode !== null && this.lastActiveViewMode !== currentMode) {
-                logPluginInit(`View mode changed from ${this.lastActiveViewMode} to ${currentMode}, refreshing`);
                 this.refreshActiveView();
             }
 
@@ -229,11 +259,9 @@ export default class TagversePlugin extends Plugin {
                             userEvent: "invalidate"
                         };
                         cm.dispatch(transactionSpec);
-                        logPluginInit('Live preview decorations invalidated with forced update');
                     }
                 } catch (error) {
-                    // If not live preview or CodeMirror not accessible, ignore
-                    logPluginInit('Could not invalidate live preview decorations', error);
+                    // If not live preview or CodeMirror not accessible, ignore silently
                 }
             }
         }
@@ -250,7 +278,6 @@ export default class TagversePlugin extends Plugin {
             }
         } catch (error) {
             // Silent fail - don't bother user with update check failures
-            logger.debug('COMMUNITY', 'Update check failed', error);
         }
     }
 }

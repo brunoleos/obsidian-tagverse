@@ -3,7 +3,7 @@ import { TagRenderer } from './renderer';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { RendererFactoryService } from '../services/renderer-factory.service';
-import { logger, logRenderPipeline, logTagMatching } from '../utils/tagverse-logger';
+import { ScopedLogger } from '../utils/logger';
 import { TagParser } from '../utils/tag-parser';
 import { REGEX_PATTERNS } from '../constants';
 
@@ -26,9 +26,10 @@ export class ReadingModeRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         targetElement: HTMLElement,
-        private args: any = {}
+        private args: any = {},
+        logger: ScopedLogger
     ) {
-        super(scriptLoader, app, tag, mapping, sourcePath);
+        super(scriptLoader, app, tag, mapping, sourcePath, logger);
         this.targetElement = targetElement;
     }
 
@@ -40,22 +41,23 @@ export class ReadingModeRenderer extends TagRenderer {
      * Render the tag in reading mode by replacing the target element and cleaning up arguments text
      */
     async render(frontmatter: any): Promise<void> {
-        await logger.withGroup(`🎨 Rendering #${this.tag}`, async (group) => {
-            try {
-                await this.renderSuccessfully(frontmatter);
-                this.rendered = true;
+        try {
+            await this.renderSuccessfully(frontmatter);
+            this.rendered = true;
 
-                // Mark rendering as successful
-                logger.debug('RENDER-READING', 'Tag rendered successfully', {
-                    tag: this.tag
-                });
-            } catch (error) {
-                this.handleRenderError(error);
+            // Mark rendering as successful
+            this.logger.info('RENDER-READING', 'Tag rendered successfully', {
+                tag: this.tag
+            });
+        } catch (error) {
+            this.handleRenderError(error);
 
-                // Log error
-                logger.error('RENDER-READING', 'Tag rendering failed', error);
-            }
-        });
+            // Log error
+            this.logger.error('RENDER-READING', 'Tag rendering failed', error as Error);
+        } finally {
+            // Auto-flush happens since this is root scope
+            this.logger.flush();
+        }
     }
 
     /**
@@ -79,7 +81,6 @@ export class ReadingModeRenderer extends TagRenderer {
      * Handle render errors with appropriate cleanup
      */
     private handleRenderError(error: any): void {
-        logger.error('RENDER-READING', 'Render failed', { tag: this.tag, error: error.message });
         const errorEl = this.handleError(error);
         this.targetElement.replaceWith(errorEl);
 
@@ -182,7 +183,7 @@ export class ReadingModeRenderer extends TagRenderer {
     protected processScriptResult(result: any): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan();
-            logRenderPipeline('Output fallback to original tag', {
+            this.logger.debug('RENDER-PIPELINE', 'Output fallback to original tag', {
                 tag: this.tag,
                 reason: 'null/undefined result'
             });
@@ -192,7 +193,7 @@ export class ReadingModeRenderer extends TagRenderer {
         if (typeof result === 'string') {
             const stringEl = createSpan();
             stringEl.innerHTML = result;
-            logRenderPipeline('Output rendered as HTML string', {
+            this.logger.debug('RENDER-PIPELINE', 'Output rendered as HTML string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -201,7 +202,7 @@ export class ReadingModeRenderer extends TagRenderer {
 
         if (result instanceof HTMLElement) {
             // Direct append for reading mode
-            logRenderPipeline('Output wrapped in container', {
+            this.logger.debug('RENDER-PIPELINE', 'Output wrapped in container', {
                 tag: this.tag,
                 elementType: result.tagName
             });
@@ -213,7 +214,7 @@ export class ReadingModeRenderer extends TagRenderer {
             cls: 'tagverse-error',
             text: `[Invalid output for #${this.tag}]`
         });
-        logger.warn('RENDER-READING', 'Invalid output type', {
+        this.logger.warn('RENDER-READING', 'Invalid output type', {
             tag: this.tag,
             type: typeof result
         });
@@ -229,20 +230,15 @@ export class ReadingModeRenderer extends TagRenderer {
         element: HTMLElement,
         context: MarkdownPostProcessorContext
     ): Promise<void> {
-        logRenderPipeline('Markdown processing started', { sourcePath: context.sourcePath });
-
         // Find all tag elements in the markdown
         const tagElements = element.findAll('a.tag');
-        logRenderPipeline('Tags discovered in markdown', { count: tagElements.length, sourcePath: context.sourcePath });
 
-        // Process all tags in parallel with index for logging
+        // Process all tags in parallel - each gets its own scoped logger from factory
         await Promise.all(
             tagElements.map((tagElement, index) =>
                 this.processTagElement(tagElement, tagMapping, rendererFactory, context, index)
             )
         );
-
-        logRenderPipeline('Markdown processing completed', { sourcePath: context.sourcePath });
     }
 
     /**
@@ -255,7 +251,7 @@ export class ReadingModeRenderer extends TagRenderer {
         context: MarkdownPostProcessorContext,
         index: number
     ): Promise<void> {
-        // Extract tag name early for logging
+        // Extract tag name early for matching
         let tagName = tagElement.textContent?.trim();
         if (!tagName) return;
         if (tagName.startsWith('#')) {
@@ -266,31 +262,23 @@ export class ReadingModeRenderer extends TagRenderer {
         const mapping = tagMapping.getMapping(tagName);
 
         if (mapping) {
-            await logger.withGroup(`📖 Processing #${tagName} at pos:${index}`, async (group) => {
-                // Extract full tag info with arguments
-                const { tag, args } = this.extractTagInfoFromElement(tagElement);
+            // Extract full tag info with arguments
+            const { tag, args } = this.extractTagInfoFromElement(tagElement);
 
-                logTagMatching('Mapping found, rendering tag', {
-                    tag,
-                    script: mapping.scriptPath,
-                    hasArgs: Object.keys(args).length > 0,
-                    sourcePath: context.sourcePath
-                }, group);
+            // Create renderer with scoped logger (factory creates logger)
+            const renderer = rendererFactory.createReadingModeRenderer(
+                mapping.tag,
+                mapping,
+                context.sourcePath,
+                tagElement,
+                args,
+                context.docId,
+                index
+            );
 
-                // Create and render the tag
-                const renderer = rendererFactory.createReadingModeRenderer(
-                    mapping.tag,
-                    mapping,
-                    context.sourcePath,
-                    tagElement,
-                    args
-                );
-
-                // Render asynchronously (renderer will create its own withGroup scope)
-                await renderer.render(context.frontmatter);
-            });
-        } else {
-            logTagMatching('No mapping found, skipping tag', { tag: tagName, sourcePath: context.sourcePath });
+            // Render (renderer has its own scoped logger and will flush)
+            await renderer.render(context.frontmatter);
         }
+        // No mapping - silently skip (no logging needed for unmatched tags)
     }
 }

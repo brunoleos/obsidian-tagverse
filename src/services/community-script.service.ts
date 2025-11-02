@@ -5,7 +5,7 @@ import {
     InstalledCommunityScript,
     TagverseSettings
 } from '../types/interfaces';
-import { logger } from '../utils/logger';
+import { ScopedLogger } from '../utils/logger';
 
 export interface ICommunityScriptService {
     fetchRegistry(): Promise<CommunityScriptsRegistry>;
@@ -27,7 +27,8 @@ export class CommunityScriptService implements ICommunityScriptService {
     constructor(
         private app: App,
         private getSettings: () => TagverseSettings,
-        private saveSettings: (settings: TagverseSettings) => Promise<void>
+        private saveSettings: (settings: TagverseSettings) => Promise<void>,
+        private logger: ScopedLogger
     ) {}
 
     async fetchRegistry(): Promise<CommunityScriptsRegistry> {
@@ -36,12 +37,12 @@ export class CommunityScriptService implements ICommunityScriptService {
 
         // Return cache if fresh
         if (this.cachedRegistry && (now - settings.lastRegistryFetch) < this.CACHE_DURATION) {
-            logger.debug('COMMUNITY', 'Using cached registry');
+            this.logger.debug('COMMUNITY', 'Using cached registry');
             return this.cachedRegistry;
         }
 
         try {
-            logger.info('COMMUNITY', 'Fetching registry from GitHub');
+            this.logger.info('COMMUNITY', 'Fetching registry from GitHub');
             const response = await requestUrl({
                 url: settings.communityRegistryUrl,
                 method: 'GET'
@@ -51,13 +52,13 @@ export class CommunityScriptService implements ICommunityScriptService {
             settings.lastRegistryFetch = now;
             await this.saveSettings(settings);
 
-            logger.info('COMMUNITY', 'Registry fetched successfully', {
+            this.logger.info('COMMUNITY', 'Registry fetched successfully', {
                 totalScripts: this.cachedRegistry?.totalScripts
             });
 
             return this.cachedRegistry!;
         } catch (error) {
-            logger.error('COMMUNITY', 'Failed to fetch registry', error);
+            this.logger.error('COMMUNITY', 'Failed to fetch registry', error as Error);
 
             // Return cached if available, even if stale
             if (this.cachedRegistry) {
@@ -115,22 +116,22 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             return response.text;
         } catch (error) {
-            logger.error('COMMUNITY', 'Failed to download script', { scriptId, error });
+            this.logger.error('COMMUNITY', 'Failed to download script', { scriptId, error });
             throw new Error(`Failed to download script: ${scriptId}`);
         }
     }
 
     async installScript(scriptId: string): Promise<void> {
-        return await logger.withGroup(`📦 Installing ${scriptId}`, async (group) => {
+        return await this.logger.withScope(`📦 Installing ${scriptId}`, async (scopedLogger) => {
             const settings = this.getSettings();
 
             // Check if script already installed
             if (settings.installedCommunityScripts.some(s => s.scriptId === scriptId)) {
-                logger.error('COMMUNITY', 'Script already installed', { scriptId });
+                scopedLogger.error('COMMUNITY', 'Script already installed', { scriptId });
                 throw new Error(`Script "${scriptId}" is already installed`);
             }
 
-            logger.info('COMMUNITY', 'Starting script installation', { scriptId });
+            scopedLogger.info('COMMUNITY', 'Starting script installation', { scriptId });
 
             // Download script
             const scriptCode = await this.downloadScript(scriptId);
@@ -139,7 +140,7 @@ export class CommunityScriptService implements ICommunityScriptService {
             const registry = await this.fetchRegistry();
             const scriptMeta = registry.scripts.find(s => s.id === scriptId);
             if (!scriptMeta) {
-                logger.error('COMMUNITY', 'Script metadata not found', { scriptId });
+                scopedLogger.error('COMMUNITY', 'Script metadata not found', { scriptId });
                 throw new Error('Script metadata not found');
             }
 
@@ -151,19 +152,19 @@ export class CommunityScriptService implements ICommunityScriptService {
             const folderPath = `.obsidian/plugins/tagverse/${this.SCRIPTS_FOLDER}`;
             try {
                 await adapter.mkdir(folderPath);
-                logger.debug('COMMUNITY', 'Created scripts folder', { folderPath });
+                scopedLogger.debug('COMMUNITY', 'Created scripts folder', { folderPath });
             } catch (e) {
                 // Folder might already exist, that's ok
-                logger.debug('COMMUNITY', 'Scripts folder already exists', { folderPath });
+                scopedLogger.debug('COMMUNITY', 'Scripts folder already exists', { folderPath });
             }
 
             // Write script file
             const fullPath = `.obsidian/plugins/tagverse/${localPath}`;
             try {
                 await adapter.write(fullPath, scriptCode);
-                logger.debug('COMMUNITY', 'Script file written', { fullPath });
+                scopedLogger.debug('COMMUNITY', 'Script file written', { fullPath });
             } catch (error) {
-                logger.error('COMMUNITY', 'Failed to write script file', { fullPath, error });
+                scopedLogger.error('COMMUNITY', 'Failed to write script file', { fullPath, error });
                 throw new Error(`Failed to write script file: ${error.message || error}`);
             }
 
@@ -178,31 +179,31 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             await this.saveSettings(settings);
 
-            logger.info('COMMUNITY', 'Script installed successfully', { scriptId, version: scriptMeta.version });
+            scopedLogger.info('COMMUNITY', 'Script installed successfully', { scriptId, version: scriptMeta.version });
             new Notice(`✅ Installed "${scriptMeta.name}"`);
         });
     }
 
     async uninstallScript(scriptId: string): Promise<void> {
-        return await logger.withGroup(`🗑️ Uninstalling ${scriptId}`, async (group) => {
+        return await this.logger.withScope(`🗑️ Uninstalling ${scriptId}`, async (scopedLogger) => {
             const settings = this.getSettings();
             const installed = settings.installedCommunityScripts.find(s => s.scriptId === scriptId);
 
             if (!installed) {
-                logger.error('COMMUNITY', 'Script not installed', { scriptId });
+                scopedLogger.error('COMMUNITY', 'Script not installed', { scriptId });
                 throw new Error(`Script not installed: ${scriptId}`);
             }
 
-            logger.info('COMMUNITY', 'Starting script uninstallation', { scriptId });
+            scopedLogger.info('COMMUNITY', 'Starting script uninstallation', { scriptId });
 
             // Remove file
             const adapter = this.app.vault.adapter;
             const fullPath = `.obsidian/plugins/tagverse/${installed.localPath}`;
             try {
                 await adapter.remove(fullPath);
-                logger.debug('COMMUNITY', 'Script file removed', { fullPath });
+                scopedLogger.debug('COMMUNITY', 'Script file removed', { fullPath });
             } catch (e) {
-                logger.warn('COMMUNITY', 'Failed to remove script file', { scriptId, fullPath, error: e });
+                scopedLogger.warn('COMMUNITY', 'Failed to remove script file', { scriptId, fullPath, error: e });
             }
 
             // Remove mapping
@@ -217,7 +218,7 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             await this.saveSettings(settings);
 
-            logger.info('COMMUNITY', 'Script uninstalled successfully', { scriptId });
+            scopedLogger.info('COMMUNITY', 'Script uninstalled successfully', { scriptId });
             new Notice(`✅ Uninstalled script`);
         });
     }
@@ -228,20 +229,20 @@ export class CommunityScriptService implements ICommunityScriptService {
         const updates = new Map<string, string>();
 
         if (settings.installedCommunityScripts.length > 0) {
-            await logger.withGroup(
+            await this.logger.withScope(
                 `🔄 Checking updates for ${settings.installedCommunityScripts.length} scripts`,
-                async (group) => {
+                async (scopedLogger) => {
                     settings.installedCommunityScripts.forEach(installed => {
                         const latest = registry.scripts.find(s => s.id === installed.scriptId);
                         if (latest && latest.version !== installed.version) {
-                            logger.debug('COMMUNITY', 'Update available', {
+                            scopedLogger.debug('COMMUNITY', 'Update available', {
                                 scriptId: installed.scriptId,
                                 currentVersion: installed.version,
                                 latestVersion: latest.version
                             });
                             updates.set(installed.scriptId, latest.version);
                         } else {
-                            logger.debug('COMMUNITY', 'Script up to date', {
+                            scopedLogger.debug('COMMUNITY', 'Script up to date', {
                                 scriptId: installed.scriptId,
                                 version: installed.version
                             });
@@ -255,16 +256,16 @@ export class CommunityScriptService implements ICommunityScriptService {
     }
 
     async updateScript(scriptId: string): Promise<void> {
-        return await logger.withGroup(`⬆️ Updating ${scriptId}`, async (group) => {
+        return await this.logger.withScope(`⬆️ Updating ${scriptId}`, async (scopedLogger) => {
             const settings = this.getSettings();
             const installed = settings.installedCommunityScripts.find(s => s.scriptId === scriptId);
 
             if (!installed) {
-                logger.error('COMMUNITY', 'Script not installed', { scriptId });
+                scopedLogger.error('COMMUNITY', 'Script not installed', { scriptId });
                 throw new Error(`Script not installed: ${scriptId}`);
             }
 
-            logger.info('COMMUNITY', 'Starting script update', { scriptId, currentVersion: installed.version });
+            scopedLogger.info('COMMUNITY', 'Starting script update', { scriptId, currentVersion: installed.version });
 
             // Download latest version
             const scriptCode = await this.downloadScript(scriptId);
@@ -273,7 +274,7 @@ export class CommunityScriptService implements ICommunityScriptService {
             const registry = await this.fetchRegistry();
             const scriptMeta = registry.scripts.find(s => s.id === scriptId);
             if (!scriptMeta) {
-                logger.error('COMMUNITY', 'Script metadata not found', { scriptId });
+                scopedLogger.error('COMMUNITY', 'Script metadata not found', { scriptId });
                 throw new Error('Script metadata not found');
             }
 
@@ -282,9 +283,9 @@ export class CommunityScriptService implements ICommunityScriptService {
             const fullPath = `.obsidian/plugins/tagverse/${installed.localPath}`;
             try {
                 await adapter.write(fullPath, scriptCode);
-                logger.debug('COMMUNITY', 'Script file updated', { fullPath });
+                scopedLogger.debug('COMMUNITY', 'Script file updated', { fullPath });
             } catch (error) {
-                logger.error('COMMUNITY', 'Failed to write updated script file', { fullPath, error });
+                scopedLogger.error('COMMUNITY', 'Failed to write updated script file', { fullPath, error });
                 throw new Error(`Failed to write updated script file: ${error.message || error}`);
             }
 
@@ -292,7 +293,7 @@ export class CommunityScriptService implements ICommunityScriptService {
             installed.version = scriptMeta.version;
             await this.saveSettings(settings);
 
-            logger.info('COMMUNITY', 'Script updated successfully', { scriptId, newVersion: scriptMeta.version });
+            scopedLogger.info('COMMUNITY', 'Script updated successfully', { scriptId, newVersion: scriptMeta.version });
             new Notice(`✅ Updated to v${scriptMeta.version}`);
         });
     }

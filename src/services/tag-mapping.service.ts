@@ -1,4 +1,4 @@
-import { logger, logPluginInit } from '../utils/tagverse-logger';
+import { ScopedLogger } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { ITagMappingProvider } from './interfaces';
 
@@ -8,6 +8,8 @@ import { ITagMappingProvider } from './interfaces';
  */
 export class TagMappingService implements ITagMappingProvider {
     private normalizedTagMap = new Map<string, TagScriptMapping>();
+
+    constructor(private logger: ScopedLogger) {}
 
     /**
      * Get mapping for a tag (case-insensitive)
@@ -23,18 +25,18 @@ export class TagMappingService implements ITagMappingProvider {
         this.normalizedTagMap.clear();
 
         if (mappings.length > 0) {
-            await logger.withGroup(
+            await this.logger.withScope(
                 `🗺️ Rebuilding ${mappings.length} tag mappings`,
-                async (group) => {
+                async (scopedLogger) => {
                     mappings.forEach((mapping) => {
                         if (mapping.enabled) {
                             this.normalizedTagMap.set(mapping.tag.toLowerCase(), { ...mapping });
-                            logger.debug('TAG-MAPPING', 'Mapping enabled', {
+                            scopedLogger.debug('TAG-MAPPING', 'Mapping enabled', {
                                 tag: mapping.tag,
                                 script: mapping.scriptPath
                             });
                         } else {
-                            logger.debug('TAG-MAPPING', 'Mapping disabled (skipped)', {
+                            scopedLogger.debug('TAG-MAPPING', 'Mapping disabled (skipped)', {
                                 tag: mapping.tag
                             });
                         }
@@ -43,7 +45,7 @@ export class TagMappingService implements ITagMappingProvider {
             );
         }
 
-        logPluginInit('Tag mappings rebuilt', {
+        this.logger.info('TAG-MAPPING', 'Tag mappings rebuilt', {
             totalMappings: mappings.length,
             enabledMappings: this.normalizedTagMap.size
         });

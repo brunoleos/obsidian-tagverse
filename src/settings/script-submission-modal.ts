@@ -1,5 +1,5 @@
 import { App, Modal, Notice, Setting, TFile } from 'obsidian';
-import { withLogScope, emit } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import TagversePlugin from '../core/plugin';
 
 export class ScriptSubmissionModal extends Modal {
@@ -44,8 +44,8 @@ export class ScriptSubmissionModal extends Modal {
                 });
 
                 dropdown.onChange(value => {
-                    withLogScope('📄 Select Script File', () => {
-                        emit('debug', 'SUBMISSION-UI', 'Script file selected', { path: value });
+                    Logger.withScope('📄 Select Script File', () => {
+                        Logger.debug( 'SUBMISSION-UI', 'Script file selected', { path: value });
                         this.scriptPath = value;
                     });
                 });
@@ -58,8 +58,8 @@ export class ScriptSubmissionModal extends Modal {
             .addText(text => text
                 .setPlaceholder('My Awesome Script')
                 .onChange(value => {
-                    withLogScope('✏️ Enter Script Name', () => {
-                        emit('debug', 'SUBMISSION-UI', 'Script name entered', { value });
+                    Logger.withScope('✏️ Enter Script Name', () => {
+                        Logger.debug( 'SUBMISSION-UI', 'Script name entered', { value });
                         this.scriptName = value;
                     });
                 })
@@ -71,8 +71,8 @@ export class ScriptSubmissionModal extends Modal {
             .addTextArea(text => text
                 .setPlaceholder('A detailed description of your script...')
                 .onChange(value => {
-                    withLogScope('📝 Enter Description', () => {
-                        emit('debug', 'SUBMISSION-UI', 'Description entered', { length: value.length });
+                    Logger.withScope('📝 Enter Description', () => {
+                        Logger.debug( 'SUBMISSION-UI', 'Description entered', { length: value.length });
                         this.description = value;
                     });
                 })
@@ -84,9 +84,9 @@ export class ScriptSubmissionModal extends Modal {
             .addText(text => text
                 .setPlaceholder('productivity, utilities')
                 .onChange(value => {
-                    withLogScope('🏷️ Enter Labels', () => {
+                    Logger.withScope('🏷️ Enter Labels', () => {
                         const labels = value.split(',').map(l => l.trim()).filter(l => l);
-                        emit('debug', 'SUBMISSION-UI', 'Labels entered', { labels, count: labels.length });
+                        Logger.debug( 'SUBMISSION-UI', 'Labels entered', { labels, count: labels.length });
                         this.labels = labels;
                     });
                 })
@@ -98,8 +98,8 @@ export class ScriptSubmissionModal extends Modal {
             .addText(text => text
                 .setPlaceholder('tasks')
                 .onChange(value => {
-                    withLogScope('🏷️ Enter Suggested Tag', () => {
-                        emit('debug', 'SUBMISSION-UI', 'Suggested tag entered', { value });
+                    Logger.withScope('🏷️ Enter Suggested Tag', () => {
+                        Logger.debug( 'SUBMISSION-UI', 'Suggested tag entered', { value });
                         this.suggestedTag = value;
                     });
                 })
@@ -110,8 +110,8 @@ export class ScriptSubmissionModal extends Modal {
             .addText(text => text
                 .setPlaceholder('Your Name')
                 .onChange(value => {
-                    withLogScope('👤 Enter Author Name', () => {
-                        emit('debug', 'SUBMISSION-UI', 'Author name entered', { value });
+                    Logger.withScope('👤 Enter Author Name', () => {
+                        Logger.debug( 'SUBMISSION-UI', 'Author name entered', { value });
                         this.authorName = value;
                     });
                 })
@@ -122,8 +122,8 @@ export class ScriptSubmissionModal extends Modal {
             .addText(text => text
                 .setPlaceholder('yourusername')
                 .onChange(value => {
-                    withLogScope('🐙 Enter GitHub Username', () => {
-                        emit('debug', 'SUBMISSION-UI', 'GitHub username entered', { value });
+                    Logger.withScope('🐙 Enter GitHub Username', () => {
+                        Logger.debug( 'SUBMISSION-UI', 'GitHub username entered', { value });
                         this.authorGithub = value;
                     });
                 })
@@ -134,8 +134,8 @@ export class ScriptSubmissionModal extends Modal {
 
         const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
         cancelBtn.addEventListener('click', () => {
-            withLogScope('❌ Cancel Submission', () => {
-                emit('debug', 'SUBMISSION-UI', 'Cancel button clicked');
+            Logger.withScope('❌ Cancel Submission', () => {
+                Logger.debug( 'SUBMISSION-UI', 'Cancel button clicked');
                 this.close();
             });
         });
@@ -145,11 +145,11 @@ export class ScriptSubmissionModal extends Modal {
             cls: 'mod-cta'
         });
         submitBtn.addEventListener('click', async () => {
-            await withLogScope('🚀 Generate Submission', async () => {
-                emit('debug', 'SUBMISSION-UI', 'Submit button clicked');
-                await withLogScope('🔄 Process Submission', async () => {
+            await Logger.withScope('🚀 Generate Submission', async () => {
+                Logger.debug( 'SUBMISSION-UI', 'Submit button clicked');
+                await Logger.withScope('🔄 Process Submission', async () => {
                     await this.generateSubmission();
-                    emit('info', 'SUBMISSION-UI', 'Submission generation completed');
+                    Logger.info( 'SUBMISSION-UI', 'Submission generation completed');
                 });
             });
         });
@@ -160,30 +160,30 @@ export class ScriptSubmissionModal extends Modal {
         let manifest: any;
         let readme: string;
 
-        await withLogScope('🔄 Generate Submission Process', async () => {
+        await Logger.withScope('🔄 Generate Submission Process', async () => {
             // Validate
-            await withLogScope('✅ Validation', async () => {
+            await Logger.withScope('✅ Validation', async () => {
                 if (!this.scriptPath || !this.scriptName || !this.description ||
                     !this.authorName || !this.authorGithub) {
-                    emit('warning', 'SUBMISSION-UI', 'Validation failed - missing required fields');
+                    Logger.warn( 'SUBMISSION-UI', 'Validation failed - missing required fields');
                     new Notice('Please fill in all required fields');
                     return;
                 }
-                emit('debug', 'SUBMISSION-UI', 'Validation passed');
+                Logger.debug( 'SUBMISSION-UI', 'Validation passed');
             });
 
             try {
                 // Read script file
-                await withLogScope('📖 Read Script File', async () => {
+                await Logger.withScope('📖 Read Script File', async () => {
                     const file = this.app.vault.getAbstractFileByPath(this.scriptPath);
                     if (!file || !(file instanceof TFile)) {
-                        emit('error', 'SUBMISSION-UI', 'Script file not found', { path: this.scriptPath });
+                        Logger.error( 'SUBMISSION-UI', 'Script file not found', { path: this.scriptPath });
                         new Notice('Script file not found');
                         return;
                     }
 
                     scriptCode = await this.app.vault.read(file);
-                    emit('debug', 'SUBMISSION-UI', 'Script file read successfully', { size: scriptCode?.length });
+                    Logger.debug( 'SUBMISSION-UI', 'Script file read successfully', { size: scriptCode?.length });
                 });
 
                 if (!scriptCode) return; // Early return if file not found
@@ -194,10 +194,10 @@ export class ScriptSubmissionModal extends Modal {
                     .replace(/[^a-z0-9]+/g, '-')
                     .replace(/^-+|-+$/g, '');
 
-                emit('debug', 'SUBMISSION-UI', 'Generated script ID', { scriptId });
+                Logger.debug( 'SUBMISSION-UI', 'Generated script ID', { scriptId });
 
                 // Generate manifest
-                await withLogScope('📋 Generate Manifest', async () => {
+                await Logger.withScope('📋 Generate Manifest', async () => {
                     manifest = {
                         id: scriptId,
                         name: this.scriptName,
@@ -212,13 +212,13 @@ export class ScriptSubmissionModal extends Modal {
                         suggestedTag: this.suggestedTag,
                         arguments: []
                     };
-                    emit('debug', 'SUBMISSION-UI', 'Manifest generated', { labels: this.labels.length });
+                    Logger.debug( 'SUBMISSION-UI', 'Manifest generated', { labels: this.labels.length });
                 });
 
                 // Generate README
-                await withLogScope('📝 Generate README', async () => {
+                await Logger.withScope('📝 Generate README', async () => {
                     readme = this.generateReadme(scriptId, manifest, scriptCode!);
-                    emit('debug', 'SUBMISSION-UI', 'README generated', { length: readme.length });
+                    Logger.debug( 'SUBMISSION-UI', 'README generated', { length: readme.length });
                 });
 
                 // Create submission package
@@ -230,32 +230,32 @@ export class ScriptSubmissionModal extends Modal {
                 };
 
                 // Copy to clipboard
-                await withLogScope('📋 Copy to Clipboard', async () => {
+                await Logger.withScope('📋 Copy to Clipboard', async () => {
                     const clipboardContent = this.formatForClipboard(submissionData);
                     await navigator.clipboard.writeText(clipboardContent);
-                    emit('debug', 'SUBMISSION-UI', 'Submission data copied to clipboard');
+                    Logger.debug( 'SUBMISSION-UI', 'Submission data copied to clipboard');
                 });
 
                 // Open GitHub PR page
-                await withLogScope('🌐 Open GitHub PR', async () => {
+                await Logger.withScope('🌐 Open GitHub PR', async () => {
                     const repoUrl = 'https://github.com/brunoleos/tagverse-community-scripts';
                     const prUrl = `${repoUrl}/compare/main...main?quick_pull=1&title=Add+${encodeURIComponent(this.scriptName)}&body=${encodeURIComponent(this.generatePRDescription(scriptId))}`;
 
                     window.open(prUrl, '_blank');
-                    emit('debug', 'SUBMISSION-UI', 'GitHub PR page opened');
+                    Logger.debug( 'SUBMISSION-UI', 'GitHub PR page opened');
                 });
 
                 new Notice('Submission prepared! Instructions copied to clipboard.');
                 this.close();
 
                 // Show instructions modal
-                await withLogScope('📋 Show Instructions', async () => {
+                await Logger.withScope('📋 Show Instructions', async () => {
                     this.showInstructionsModal(scriptId);
-                    emit('debug', 'SUBMISSION-UI', 'Instructions modal shown');
+                    Logger.debug( 'SUBMISSION-UI', 'Instructions modal shown');
                 });
 
             } catch (error) {
-                emit('error', 'SUBMISSION-UI', 'Submission generation failed', error as Error);
+                Logger.error( 'SUBMISSION-UI', 'Submission generation failed', error as Error);
                 new Notice(`Failed to prepare submission: ${error.message}`);
             }
         });

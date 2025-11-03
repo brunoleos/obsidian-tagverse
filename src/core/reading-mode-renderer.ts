@@ -3,7 +3,7 @@ import { TagRenderer } from './renderer';
 import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
 import { RendererFactoryService } from '../services/renderer-factory.service';
-import { withLogScope, emit } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { TagParser } from '../utils/tag-parser';
 import { REGEX_PATTERNS } from '../constants';
 
@@ -41,19 +41,19 @@ export class ReadingModeRenderer extends TagRenderer {
      * Render the tag in reading mode by replacing the target element and cleaning up arguments text
      */
     async render(frontmatter: any): Promise<void> {
-        await withLogScope('🎨 Render Tag', async () => {
+        await Logger.withScope('🎨 Render Tag', async () => {
             try {
                 await this.renderSuccessfully(frontmatter);
                 this.rendered = true;
 
                 // Mark rendering as successful
-                emit('debug', 'RENDER-READING', 'Tag rendered successfully', {
+                Logger.debug('RENDER-READING', 'Tag rendered successfully', {
                     tag: this.tag
                 });
             } catch (error) {
-                await withLogScope('❌ Handle Error', async () => {
+                await Logger.withScope('❌ Handle Error', async () => {
                     this.handleRenderError(error);
-                    emit('error', 'RENDER-READING', 'Tag rendering failed', error as Error);
+                    Logger.error('RENDER-READING', 'Tag rendering failed', error as Error);
                 });
             }
         }); // Auto-flush
@@ -67,9 +67,9 @@ export class ReadingModeRenderer extends TagRenderer {
         const result = await this.executeScript(frontmatter, this.args);
 
         // Process the result with nested scope
-        const contentElement = await withLogScope('🔄 Process Result', async () => {
+        const contentElement = await Logger.withScope('🔄 Process Result', async () => {
             const element = this.processScriptResult(result);
-            emit('debug', 'RENDER-PIPELINE', 'Script result processed into DOM element', {
+            Logger.debug('RENDER-PIPELINE', 'Script result processed into DOM element', {
                 tag: this.tag,
                 resultType: typeof result
             });
@@ -77,18 +77,18 @@ export class ReadingModeRenderer extends TagRenderer {
         });
 
         // DOM replacement with nested scope
-        await withLogScope('🔄 DOM Replacement', async () => {
+        await Logger.withScope('🔄 DOM Replacement', async () => {
             const wrapper = createSpan();
             wrapper.appendChild(contentElement);
             this.targetElement.replaceWith(wrapper);
-            emit('debug', 'RENDER-PIPELINE', 'Tag element replaced with rendered content', {
+            Logger.debug('RENDER-PIPELINE', 'Tag element replaced with rendered content', {
                 tag: this.tag
             });
 
             // Clean up any arguments text (search next to wrapper now in DOM)
-            await withLogScope('🧹 Args Cleanup', async () => {
+            await Logger.withScope('🧹 Args Cleanup', async () => {
                 this.performArgsCleanup(wrapper);
-                emit('debug', 'RENDER-PIPELINE', 'Arguments text cleaned up', {
+                Logger.debug('RENDER-PIPELINE', 'Arguments text cleaned up', {
                     tag: this.tag,
                     hasArgs: Object.keys(this.args).length > 0
                 });
@@ -202,7 +202,7 @@ export class ReadingModeRenderer extends TagRenderer {
     protected processScriptResult(result: any): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan();
-            emit('debug', 'RENDER-PIPELINE', 'Output fallback to original tag', {
+            Logger.debug('RENDER-PIPELINE', 'Output fallback to original tag', {
                 tag: this.tag,
                 reason: 'null/undefined result'
             });
@@ -212,7 +212,7 @@ export class ReadingModeRenderer extends TagRenderer {
         if (typeof result === 'string') {
             const stringEl = createSpan();
             stringEl.innerHTML = result;
-            emit('debug', 'RENDER-PIPELINE', 'Output rendered as HTML string', {
+            Logger.debug('RENDER-PIPELINE', 'Output rendered as HTML string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -221,7 +221,7 @@ export class ReadingModeRenderer extends TagRenderer {
 
         if (result instanceof HTMLElement) {
             // Direct append for reading mode
-            emit('debug', 'RENDER-PIPELINE', 'Output wrapped in container', {
+            Logger.debug('RENDER-PIPELINE', 'Output wrapped in container', {
                 tag: this.tag,
                 elementType: result.tagName
             });
@@ -233,7 +233,7 @@ export class ReadingModeRenderer extends TagRenderer {
             cls: 'tagverse-error',
             text: `[Invalid output for #${this.tag}]`
         });
-        emit('warning', 'RENDER-READING', 'Invalid output type', {
+        Logger.warn('RENDER-READING', 'Invalid output type', {
             tag: this.tag,
             type: typeof result
         });
@@ -267,7 +267,7 @@ export class ReadingModeRenderer extends TagRenderer {
 
         // Log page render completion if any tags were rendered
         if (renderedCount > 0) {
-            emit('info', 'RENDER-READING', 'Page rendered successfully', {
+            Logger.info('RENDER-READING', 'Page rendered successfully', {
                 tagCount: renderedCount,
                 sourcePath: context.sourcePath
             });

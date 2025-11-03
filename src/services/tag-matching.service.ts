@@ -3,7 +3,7 @@ import { App } from 'obsidian';
 import { TagScriptMapping } from '../types/interfaces';
 import { ITagMappingProvider } from './interfaces';
 import { RendererFactoryService } from './renderer-factory.service';
-import { logger } from '../utils/logger';
+import { Logger } from '../utils/logger';
 
 export interface MatchContext {
     tag: string;
@@ -35,18 +35,18 @@ export class TagMatchingService {
 
         // For unmapped tags: no widget
         if (!mapping) {
-            logger.debug('TAG-MATCH', 'No mapping found, skipping', { tag, pos: context.position });
+            Logger.debug('TAG-MATCH', 'No mapping found, skipping', { tag, pos: context.position });
             return false;
         }
 
         // When cursor is inside tag (in live preview), show natively for editing
         if (isLivePreview && cursorInside) {
-            logger.debug('TAG-MATCH', 'Cursor inside tag, showing natively', { tag, pos: context.position });
+            Logger.debug('TAG-MATCH', 'Cursor inside tag, showing natively', { tag, pos: context.position });
             return false;
         }
 
         // In live preview, show widgets for mapped tags when cursor is outside
-        logger.debug('TAG-MATCH', 'Creating widget for tag', { tag, pos: context.position, script: mapping.scriptPath });
+        Logger.debug('TAG-MATCH', 'Creating widget for tag', { tag, pos: context.position, script: mapping.scriptPath });
         return true;
     }
 

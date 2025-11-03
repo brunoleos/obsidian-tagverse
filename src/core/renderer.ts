@@ -1,5 +1,5 @@
 import { Notice, App } from 'obsidian';
-import { withLogScope, emit } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { TagScriptMapping, ScriptContext } from '../types/interfaces';
 import { IScriptLoader } from '../services/interfaces';
 
@@ -18,7 +18,7 @@ export abstract class TagRenderer {
         protected mapping: TagScriptMapping,
         protected sourcePath: string
     ) {
-        emit('debug', 'WIDGET', 'TagRenderer created', {
+        Logger.debug('WIDGET', 'TagRenderer created', {
             tag: this.tag,
             script: this.mapping.scriptPath,
             source: this.sourcePath,
@@ -54,20 +54,20 @@ export abstract class TagRenderer {
 
     protected logScriptResult(result: any) {
         if (result instanceof HTMLElement) {
-            emit('debug', 'SCRIPT-EXEC', 'Script returned HTMLElement', {
+            Logger.debug('SCRIPT-EXEC', 'Script returned HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName,
                 hasContent: result.innerHTML.length > 0,
                 classes: result.className
             });
         } else if (typeof result === 'string') {
-            emit('debug', 'SCRIPT-EXEC', 'Script returned string', {
+            Logger.debug('SCRIPT-EXEC', 'Script returned string', {
                 tag: this.tag,
                 length: result.length,
                 preview: result.substring(0, 100)
             });
         } else {
-            emit('debug', 'SCRIPT-EXEC', 'Script returned value', {
+            Logger.debug('SCRIPT-EXEC', 'Script returned value', {
                 tag: this.tag,
                 type: typeof result,
                 isNull: result === null || result === undefined
@@ -83,7 +83,7 @@ export abstract class TagRenderer {
         const modeName = this.getMode() === 'live-preview' ? 'Widget' : 'Reading';
 
         // Log render start
-        emit('debug', groupName, `${modeName} render started`, {
+        Logger.debug(groupName, `${modeName} render started`, {
             tag: this.tag,
             script: this.mapping.scriptPath,
             source: this.sourcePath,
@@ -93,15 +93,15 @@ export abstract class TagRenderer {
         try {
             // Script loading phase - use nested scope
             let renderFunction: Function;
-            await withLogScope('Load Script', async () => {
-                emit('debug', 'SCRIPT-LOAD', `Loading script for #${this.tag}`, {
+            await Logger.withScope('Load Script', async () => {
+                Logger.debug('SCRIPT-LOAD', `Loading script for #${this.tag}`, {
                     script: this.mapping.scriptPath,
                     tag: this.tag
                 });
 
                 renderFunction = await this.loadScript(this.mapping.scriptPath);
 
-                emit('debug', 'SCRIPT-LOAD', `Script loaded for #${this.tag}`, {
+                Logger.debug('SCRIPT-LOAD', `Script loaded for #${this.tag}`, {
                     script: this.mapping.scriptPath,
                     cached: true
                 });
@@ -109,10 +109,10 @@ export abstract class TagRenderer {
 
             // Script execution phase - use nested scope
             let result: any;
-            await withLogScope('Execute Script', async () => {
+            await Logger.withScope('Execute Script', async () => {
                 const scriptContext = this.createScriptContext(frontmatter, args);
 
-                emit('debug', 'SCRIPT-EXEC', `Executing script for #${this.tag}`, {
+                Logger.debug('SCRIPT-EXEC', `Executing script for #${this.tag}`, {
                     tag: this.tag,
                     script: this.mapping.scriptPath,
                     hasArgs: Object.keys(args).length > 0,
@@ -124,22 +124,23 @@ export abstract class TagRenderer {
                 // Output processing phase
                 this.logScriptResult(result);
 
-                emit('info', 'SCRIPT-EXEC', `Script executed successfully`, {
+                Logger.debug('SCRIPT-EXEC', `Script executed successfully`, {
                     tag: this.tag,
-                    resultType: result instanceof HTMLElement ? 'HTMLElement' : typeof result
+                    script: this.mapping.scriptPath
                 });
             });
 
             // Success summary
-            emit('info', groupName, `${modeName} render complete`, {
+            Logger.debug(groupName, `${modeName} render complete`, {
                 tag: this.tag,
                 success: true,
+                script: this.mapping.scriptPath,
                 resultType: result instanceof HTMLElement ? 'HTMLElement' : typeof result
             });
 
             return result;
         } catch (error) {
-            emit('error', 'RENDER-PIPELINE', `${modeName} rendering failed`, error as Error);
+            Logger.error('RENDER-PIPELINE', `${modeName} rendering failed`, error as Error);
             throw error;
         }
     }
@@ -153,7 +154,7 @@ export abstract class TagRenderer {
      * Handle rendering errors
      */
     protected handleError(error: Error): HTMLElement {
-        emit('error', 'ERROR-HANDLING', `${this.getMode()} rendering error`, error);
+        Logger.error('ERROR-HANDLING', `${this.getMode()} rendering error`, error);
 
         // Don't show notice here - logger already handles it
         // Just create error element for inline display

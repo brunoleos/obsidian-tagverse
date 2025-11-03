@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { withLogScope, emit, logger, setDefaultLogLevel, setDefaultLoggerOptions, LogCategory } from '../utils/logger';
+import { Logger, LoggerConfig } from '../utils/logger';
 import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
 import { ISettingsService } from './interfaces';
 
@@ -26,33 +26,33 @@ export class SettingsService implements ISettingsService {
      * Save settings
      */
     async saveSettings(settings: TagverseSettings): Promise<void> {
-        await withLogScope('⚙️ Save Settings', async () => {
+        await Logger.withScope('⚙️ Save Settings', async () => {
             this.settings = settings;
 
-            await withLogScope('💾 Write to Disk', async () => {
+            await Logger.withScope('💾 Write to Disk', async () => {
                 await this.plugin.saveData(settings);
-                emit('debug', 'SETTINGS', 'Settings written to disk', {
+                Logger.debug('SETTINGS', 'Settings written to disk', {
                     mappingCount: settings.tagMappings.length,
                     logLevel: settings.logLevel
                 });
             });
 
-            await withLogScope('🔧 Update Log Level', async () => {
-                setDefaultLogLevel(settings.logLevel || 'debug');
-                emit('debug', 'SETTINGS', 'Log level updated', {
+            await Logger.withScope('🔧 Update Log Level', async () => {
+                LoggerConfig.setLogLevel(settings.logLevel || 'debug');
+                Logger.debug('SETTINGS', 'Log level updated', {
                     logLevel: settings.logLevel
                 });
             });
 
-            emit('info', 'SETTINGS', 'Settings saved', {
+            Logger.info('SETTINGS', 'Settings saved', {
                 mappingCount: settings.tagMappings.length,
                 logLevel: settings.logLevel
             });
 
             // Notify all registered callbacks
-            await withLogScope('📢 Notify Callbacks', async () => {
+            await Logger.withScope('📢 Notify Callbacks', async () => {
                 this.notifyCallbacks();
-                emit('debug', 'SETTINGS', `Notified ${this.changeCallbacks.length} callback(s)`);
+                Logger.debug('SETTINGS', `Notified ${this.changeCallbacks.length} callback(s)`);
             });
         }); // Auto-flush
     }
@@ -61,39 +61,39 @@ export class SettingsService implements ISettingsService {
      * Load settings from storage
      */
     async loadSettings(): Promise<void> {
-        await withLogScope('⚙️ Load Settings', async () => {
-            await withLogScope('📖 Read from Disk', async () => {
+        await Logger.withScope('⚙️ Load Settings', async () => {
+            await Logger.withScope('📖 Read from Disk', async () => {
                 const loadedData = await this.plugin.loadData();
                 this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-                emit('debug', 'SETTINGS', 'Settings read from disk', {
+                Logger.debug('SETTINGS', 'Settings read from disk', {
                     hasData: !!loadedData,
                     mappingCount: loadedData?.tagMappings?.length || 0
                 });
             });
 
-            await withLogScope('🔧 Update Log Level', async () => {
-                setDefaultLogLevel(this.settings.logLevel || 'debug');
-                emit('debug', 'SETTINGS', 'Log level updated', {
+            await Logger.withScope('🔧 Update Log Level', async () => {
+                LoggerConfig.setLogLevel(this.settings.logLevel || 'debug');
+                Logger.debug('SETTINGS', 'Log level updated', {
                     logLevel: this.settings.logLevel
                 });
             });
 
-            emit('info', 'SETTINGS', 'Settings loaded', {
+            Logger.info('SETTINGS', 'Settings loaded', {
                 mappingCount: this.settings.tagMappings.length,
                 refreshOnFileChange: this.settings.refreshOnFileChange,
                 logLevel: this.settings.logLevel
             });
 
-            await withLogScope('🗺️ Log Mappings', async () => {
+            await Logger.withScope('🗺️ Log Mappings', async () => {
                 this.settings.tagMappings.forEach((m, i) => {
-                    emit('debug', 'SETTINGS', 'Mapping configured', {
+                    Logger.debug('SETTINGS', 'Mapping configured', {
                         index: i,
                         tag: m.tag,
                         script: m.scriptPath,
                         enabled: m.enabled
                     });
                 });
-                emit('debug', 'SETTINGS', `Logged ${this.settings.tagMappings.length} mapping(s)`);
+                Logger.debug('SETTINGS', `Logged ${this.settings.tagMappings.length} mapping(s)`);
             });
         }); // Auto-flush
     }
@@ -114,8 +114,8 @@ export class SettingsService implements ISettingsService {
             try {
                 callback(this.settings);
             } catch (error) {
-                // Use InstantLogger for synchronous error logging
-                logger.error('ERROR-HANDLING', `Settings change callback ${index} failed`, error as Error);
+                // Use Logger for synchronous error logging
+                Logger.error('ERROR-HANDLING', `Settings change callback ${index} failed`, error as Error);
             }
         });
     }

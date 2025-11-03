@@ -1,4 +1,4 @@
-import { withLogScope, emit } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { TagScriptMapping } from '../types/interfaces';
 import { ITagMappingProvider } from './interfaces';
 
@@ -25,18 +25,18 @@ export class TagMappingService implements ITagMappingProvider {
         this.normalizedTagMap.clear();
 
         if (mappings.length > 0) {
-            await withLogScope(
+            await Logger.withScope(
                 `🗺️ Rebuilding ${mappings.length} tag mappings`,
                 async () => {
                     mappings.forEach((mapping) => {
                         if (mapping.enabled) {
                             this.normalizedTagMap.set(mapping.tag.toLowerCase(), { ...mapping });
-                            emit('debug', 'TAG-MAPPING', 'Mapping enabled', {
+                            Logger.debug('TAG-MAPPING', 'Mapping enabled', {
                                 tag: mapping.tag,
                                 script: mapping.scriptPath
                             });
                         } else {
-                            emit('debug', 'TAG-MAPPING', 'Mapping disabled (skipped)', {
+                            Logger.debug('TAG-MAPPING', 'Mapping disabled (skipped)', {
                                 tag: mapping.tag
                             });
                         }
@@ -45,7 +45,7 @@ export class TagMappingService implements ITagMappingProvider {
             );
         }
 
-        emit('debug', 'TAG-MAPPING', 'Tag mappings rebuilt', {
+        Logger.debug('TAG-MAPPING', 'Tag mappings rebuilt', {
             totalMappings: mappings.length,
             enabledMappings: this.normalizedTagMap.size
         });

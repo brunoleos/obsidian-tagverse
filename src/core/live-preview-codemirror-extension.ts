@@ -8,7 +8,7 @@ import {
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
 import { StateField } from '@codemirror/state';
-import { withLogScope, emit } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { TagMatchingService, MatchContext } from '../services/tag-matching.service';
 import { TagMappingStateManager } from './live-preview-state';
 import { TagParser } from '../utils/tag-parser';
@@ -37,7 +37,7 @@ export class LivePreviewCodeMirrorExtension {
 
             constructor(view: EditorView) {
                 const file = app.workspace.getActiveFile();
-                emit('debug', 'VIEWPLUGIN', 'ViewPlugin created', {
+                Logger.debug('VIEWPLUGIN', 'ViewPlugin created', {
                     filePath: file?.path || 'unknown'
                 });
                 // Defer initial decoration creation to first update to prevent duplicate processing
@@ -49,7 +49,7 @@ export class LivePreviewCodeMirrorExtension {
                 if (this.needsInitialUpdate) {
                     this.needsInitialUpdate = false;
                     const file = app.workspace.getActiveFile();
-                    emit('debug', 'VIEWPLUGIN', 'Initial update - creating decorations', {
+                    Logger.debug('VIEWPLUGIN', 'Initial update - creating decorations', {
                         filePath: file?.path || 'unknown',
                         docLength: update.view.state.doc.length
                     });
@@ -81,7 +81,7 @@ export class LivePreviewCodeMirrorExtension {
                         .map(([key]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
                         .join(', ');
 
-                    emit('debug', 'VIEWPLUGIN', 'Rebuilding decorations', {
+                    Logger.debug('VIEWPLUGIN', 'Rebuilding decorations', {
                         reason: reasonStr,
                         cursor: update.state.selection.main.head
                     });
@@ -96,7 +96,7 @@ export class LivePreviewCodeMirrorExtension {
 
             destroy() {
                 const file = app.workspace.getActiveFile();
-                emit('debug', 'VIEWPLUGIN', 'ViewPlugin destroyed', {
+                Logger.debug('VIEWPLUGIN', 'ViewPlugin destroyed', {
                     filePath: file?.path || 'unknown'
                 });
             }

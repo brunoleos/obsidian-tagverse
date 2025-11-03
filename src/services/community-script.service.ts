@@ -5,7 +5,7 @@ import {
     InstalledCommunityScript,
     TagverseSettings
 } from '../types/interfaces';
-import { withLogScope, emit } from '../utils/logger';
+import { Logger } from '../utils/logger';
 
 export interface ICommunityScriptService {
     fetchRegistry(): Promise<CommunityScriptsRegistry>;
@@ -31,19 +31,19 @@ export class CommunityScriptService implements ICommunityScriptService {
     ) {}
 
     async fetchRegistry(): Promise<CommunityScriptsRegistry> {
-        return await withLogScope('📡 Fetch Registry', async () => {
+        return await Logger.withScope('📡 Fetch Registry', async () => {
             const settings = this.getSettings();
             const now = Date.now();
 
             // Check cache first
-            const cached = await withLogScope('💾 Check Cache', async () => {
+            const cached = await Logger.withScope('💾 Check Cache', async () => {
                 if (this.cachedRegistry && (now - settings.lastRegistryFetch) < this.CACHE_DURATION) {
-                    emit('debug', 'COMMUNITY', 'Using cached registry', {
+                    Logger.debug('COMMUNITY', 'Using cached registry', {
                         age: now - settings.lastRegistryFetch
                     });
                     return this.cachedRegistry;
                 }
-                emit('debug', 'COMMUNITY', 'Cache miss or expired', {
+                Logger.debug('COMMUNITY', 'Cache miss or expired', {
                     cacheAge: now - settings.lastRegistryFetch,
                     cacheDuration: this.CACHE_DURATION
                 });
@@ -56,8 +56,8 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             // Download from network
             try {
-                await withLogScope('🌐 Network Request', async () => {
-                    emit('debug', 'COMMUNITY', 'Fetching registry from GitHub', {
+                await Logger.withScope('🌐 Network Request', async () => {
+                    Logger.debug('COMMUNITY', 'Fetching registry from GitHub', {
                         url: settings.communityRegistryUrl
                     });
                     const response = await requestUrl({
@@ -66,26 +66,26 @@ export class CommunityScriptService implements ICommunityScriptService {
                     });
 
                     this.cachedRegistry = JSON.parse(response.text);
-                    emit('debug', 'COMMUNITY', 'Registry downloaded', {
+                    Logger.debug('COMMUNITY', 'Registry downloaded', {
                         totalScripts: this.cachedRegistry?.totalScripts
                     });
                 });
 
                 // Update cache timestamp
-                await withLogScope('⚙️ Update Settings', async () => {
+                await Logger.withScope('⚙️ Update Settings', async () => {
                     settings.lastRegistryFetch = now;
                     await this.saveSettings(settings);
-                    emit('debug', 'COMMUNITY', 'Cache timestamp updated', {
+                    Logger.debug('COMMUNITY', 'Cache timestamp updated', {
                         timestamp: now
                     });
                 });
 
-                emit('debug', 'COMMUNITY', 'Registry fetched successfully', {
+                Logger.debug('COMMUNITY', 'Registry fetched successfully', {
                     totalScripts: this.cachedRegistry!.totalScripts
                 });
                 return this.cachedRegistry!;
             } catch (error) {
-                emit('error', 'COMMUNITY', 'Failed to fetch registry', error as Error);
+                Logger.error('COMMUNITY', 'Failed to fetch registry', error as Error);
 
                 // Return cached if available, even if stale
                 if (this.cachedRegistry) {
@@ -144,40 +144,40 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             return response.text;
         } catch (error) {
-            emit('error', 'COMMUNITY', 'Failed to download script', { scriptId, error });
+            Logger.error('COMMUNITY', 'Failed to download script', { scriptId, error });
             throw new Error(`Failed to download script: ${scriptId}`);
         }
     }
 
     async installScript(scriptId: string): Promise<void> {
-        return await withLogScope(`📦 Installing ${scriptId}`, async () => {
+        return await Logger.withScope(`📦 Installing ${scriptId}`, async () => {
             const settings = this.getSettings();
 
             // Validation phase
-            await withLogScope('✅ Validation', async () => {
+            await Logger.withScope('✅ Validation', async () => {
                 if (settings.installedCommunityScripts.some(s => s.scriptId === scriptId)) {
-                    emit('error', 'COMMUNITY', 'Script already installed', { scriptId });
+                    Logger.error('COMMUNITY', 'Script already installed', { scriptId });
                     throw new Error(`Script "${scriptId}" is already installed`);
                 }
-                emit('debug', 'COMMUNITY', 'Validation passed', { scriptId });
+                Logger.debug('COMMUNITY', 'Validation passed', { scriptId });
             });
 
-            emit('debug', 'COMMUNITY', 'Starting script installation', { scriptId });
+            Logger.debug('COMMUNITY', 'Starting script installation', { scriptId });
 
             // Download phase
-            const { scriptCode, scriptMeta } = await withLogScope('⬇️ Download', async () => {
-                emit('debug', 'COMMUNITY', 'Downloading script code', { scriptId });
+            const { scriptCode, scriptMeta } = await Logger.withScope('⬇️ Download', async () => {
+                Logger.debug('COMMUNITY', 'Downloading script code', { scriptId });
                 const code = await this.downloadScript(scriptId);
 
-                emit('debug', 'COMMUNITY', 'Fetching metadata', { scriptId });
+                Logger.debug('COMMUNITY', 'Fetching metadata', { scriptId });
                 const registry = await this.fetchRegistry();
                 const meta = registry.scripts.find(s => s.id === scriptId);
                 if (!meta) {
-                    emit('error', 'COMMUNITY', 'Script metadata not found', { scriptId });
+                    Logger.error('COMMUNITY', 'Script metadata not found', { scriptId });
                     throw new Error('Script metadata not found');
                 }
 
-                emit('debug', 'COMMUNITY', 'Download complete', {
+                Logger.debug('COMMUNITY', 'Download complete', {
                     version: meta.version,
                     size: code.length
                 });
@@ -186,38 +186,38 @@ export class CommunityScriptService implements ICommunityScriptService {
             });
 
             // File system operations phase
-            await withLogScope('💾 File System', async () => {
+            await Logger.withScope('💾 File System', async () => {
                 const localPath = `${this.SCRIPTS_FOLDER}/${scriptId}.js`;
                 const adapter = this.app.vault.adapter;
                 const folderPath = `.obsidian/plugins/tagverse/${this.SCRIPTS_FOLDER}`;
 
                 // Ensure folder exists
-                await withLogScope('📁 Create Folder', async () => {
+                await Logger.withScope('📁 Create Folder', async () => {
                     try {
                         await adapter.mkdir(folderPath);
-                        emit('debug', 'COMMUNITY', 'Created scripts folder', { folderPath });
+                        Logger.debug('COMMUNITY', 'Created scripts folder', { folderPath });
                     } catch (e) {
-                        emit('debug', 'COMMUNITY', 'Scripts folder already exists', { folderPath });
+                        Logger.debug('COMMUNITY', 'Scripts folder already exists', { folderPath });
                     }
                 });
 
                 // Write script file
-                await withLogScope('📝 Write File', async () => {
+                await Logger.withScope('📝 Write File', async () => {
                     const fullPath = `.obsidian/plugins/tagverse/${localPath}`;
                     try {
                         await adapter.write(fullPath, scriptCode);
-                        emit('debug', 'COMMUNITY', 'Script file written', {
+                        Logger.debug('COMMUNITY', 'Script file written', {
                             fullPath,
                             size: scriptCode.length
                         });
                     } catch (error) {
-                        emit('error', 'COMMUNITY', 'Failed to write script file', { fullPath, error });
+                        Logger.error('COMMUNITY', 'Failed to write script file', { fullPath, error });
                         throw new Error(`Failed to write script file: ${error.message || error}`);
                     }
                 });
 
                 // Track installation
-                await withLogScope('⚙️ Update Settings', async () => {
+                await Logger.withScope('⚙️ Update Settings', async () => {
                     settings.installedCommunityScripts.push({
                         scriptId,
                         version: scriptMeta.version,
@@ -227,38 +227,38 @@ export class CommunityScriptService implements ICommunityScriptService {
                     });
 
                     await this.saveSettings(settings);
-                    emit('debug', 'COMMUNITY', 'Installation tracked in settings', {
+                    Logger.debug('COMMUNITY', 'Installation tracked in settings', {
                         scriptId,
                         version: scriptMeta.version
                     });
                 });
             });
 
-            emit('info', 'COMMUNITY', 'Script installed successfully', { scriptId, version: scriptMeta.version });
+            Logger.debug('COMMUNITY', 'Script installed successfully', { scriptId, version: scriptMeta.version });
             new Notice(`✅ Installed "${scriptMeta.name}"`);
         });
     }
 
     async uninstallScript(scriptId: string): Promise<void> {
-        return await withLogScope(`🗑️ Uninstalling ${scriptId}`, async () => {
+        return await Logger.withScope(`🗑️ Uninstalling ${scriptId}`, async () => {
             const settings = this.getSettings();
             const installed = settings.installedCommunityScripts.find(s => s.scriptId === scriptId);
 
             if (!installed) {
-                emit('error', 'COMMUNITY', 'Script not installed', { scriptId });
+                Logger.error('COMMUNITY', 'Script not installed', { scriptId });
                 throw new Error(`Script not installed: ${scriptId}`);
             }
 
-            emit('debug', 'COMMUNITY', 'Starting script uninstallation', { scriptId });
+            Logger.debug('COMMUNITY', 'Starting script uninstallation', { scriptId });
 
             // Remove file
             const adapter = this.app.vault.adapter;
             const fullPath = `.obsidian/plugins/tagverse/${installed.localPath}`;
             try {
                 await adapter.remove(fullPath);
-                emit('debug', 'COMMUNITY', 'Script file removed', { fullPath });
+                Logger.debug('COMMUNITY', 'Script file removed', { fullPath });
             } catch (e) {
-                emit('warning', 'COMMUNITY', 'Failed to remove script file', { scriptId, fullPath, error: e });
+                Logger.warn('COMMUNITY', 'Failed to remove script file', { scriptId, fullPath, error: e });
             }
 
             // Remove mapping
@@ -273,7 +273,7 @@ export class CommunityScriptService implements ICommunityScriptService {
 
             await this.saveSettings(settings);
 
-            emit('info', 'COMMUNITY', 'Script uninstalled successfully', { scriptId });
+            Logger.debug('COMMUNITY', 'Script uninstalled successfully', { scriptId });
             new Notice(`✅ Uninstalled script`);
         });
     }
@@ -284,20 +284,20 @@ export class CommunityScriptService implements ICommunityScriptService {
         const updates = new Map<string, string>();
 
         if (settings.installedCommunityScripts.length > 0) {
-            await withLogScope(
+            await Logger.withScope(
                 `🔄 Checking updates for ${settings.installedCommunityScripts.length} scripts`,
                 async () => {
                     settings.installedCommunityScripts.forEach(installed => {
                         const latest = registry.scripts.find(s => s.id === installed.scriptId);
                         if (latest && latest.version !== installed.version) {
-                            emit('debug', 'COMMUNITY', 'Update available', {
+                            Logger.debug('COMMUNITY', 'Update available', {
                                 scriptId: installed.scriptId,
                                 currentVersion: installed.version,
                                 latestVersion: latest.version
                             });
                             updates.set(installed.scriptId, latest.version);
                         } else {
-                            emit('debug', 'COMMUNITY', 'Script up to date', {
+                            Logger.debug('COMMUNITY', 'Script up to date', {
                                 scriptId: installed.scriptId,
                                 version: installed.version
                             });
@@ -311,17 +311,17 @@ export class CommunityScriptService implements ICommunityScriptService {
     }
 
     async updateScript(scriptId: string): Promise<void> {
-        return await withLogScope(`⬆️ Updating ${scriptId}`, async () => {
+        return await Logger.withScope(`⬆️ Updating ${scriptId}`, async () => {
             const settings = this.getSettings();
             let installed = settings.installedCommunityScripts.find(s => s.scriptId === scriptId);
 
             // Validation phase
-            await withLogScope('✅ Validation', async () => {
+            await Logger.withScope('✅ Validation', async () => {
                 if (!installed) {
-                    emit('error', 'COMMUNITY', 'Script not installed', { scriptId });
+                    Logger.error('COMMUNITY', 'Script not installed', { scriptId });
                     throw new Error(`Script not installed: ${scriptId}`);
                 }
-                emit('debug', 'COMMUNITY', 'Script is installed', {
+                Logger.debug('COMMUNITY', 'Script is installed', {
                     currentVersion: installed.version
                 });
             });
@@ -329,22 +329,22 @@ export class CommunityScriptService implements ICommunityScriptService {
             // TypeScript now knows installed is defined after validation
             if (!installed) return; // This should never happen, but helps TypeScript
 
-            emit('debug', 'COMMUNITY', 'Starting script update', { scriptId, currentVersion: installed.version });
+            Logger.debug('COMMUNITY', 'Starting script update', { scriptId, currentVersion: installed.version });
 
             // Download phase
-            const { scriptCode, scriptMeta } = await withLogScope('⬇️ Download Latest', async () => {
-                emit('debug', 'COMMUNITY', 'Downloading latest script version', { scriptId });
+            const { scriptCode, scriptMeta } = await Logger.withScope('⬇️ Download Latest', async () => {
+                Logger.debug('COMMUNITY', 'Downloading latest script version', { scriptId });
                 const code = await this.downloadScript(scriptId);
 
-                emit('debug', 'COMMUNITY', 'Fetching latest metadata', { scriptId });
+                Logger.debug('COMMUNITY', 'Fetching latest metadata', { scriptId });
                 const registry = await this.fetchRegistry();
                 const meta = registry.scripts.find(s => s.id === scriptId);
                 if (!meta) {
-                    emit('error', 'COMMUNITY', 'Script metadata not found', { scriptId });
+                    Logger.error('COMMUNITY', 'Script metadata not found', { scriptId });
                     throw new Error('Script metadata not found');
                 }
 
-                emit('debug', 'COMMUNITY', 'Latest version downloaded', {
+                Logger.debug('COMMUNITY', 'Latest version downloaded', {
                     oldVersion: installed!.version,
                     newVersion: meta.version,
                     size: code.length
@@ -354,32 +354,32 @@ export class CommunityScriptService implements ICommunityScriptService {
             });
 
             // File overwrite phase
-            await withLogScope('💾 Overwrite File', async () => {
+            await Logger.withScope('💾 Overwrite File', async () => {
                 const adapter = this.app.vault.adapter;
                 const fullPath = `.obsidian/plugins/tagverse/${installed!.localPath}`;
 
                 try {
                     await adapter.write(fullPath, scriptCode);
-                    emit('debug', 'COMMUNITY', 'Script file overwritten', {
+                    Logger.debug('COMMUNITY', 'Script file overwritten', {
                         fullPath,
                         size: scriptCode.length
                     });
                 } catch (error) {
-                    emit('error', 'COMMUNITY', 'Failed to write updated script file', { fullPath, error });
+                    Logger.error('COMMUNITY', 'Failed to write updated script file', { fullPath, error });
                     throw new Error(`Failed to write updated script file: ${error.message || error}`);
                 }
             });
 
             // Update version tracking
-            await withLogScope('⚙️ Update Settings', async () => {
+            await Logger.withScope('⚙️ Update Settings', async () => {
                 installed!.version = scriptMeta.version;
                 await this.saveSettings(settings);
-                emit('debug', 'COMMUNITY', 'Version tracking updated', {
+                Logger.debug('COMMUNITY', 'Version tracking updated', {
                     newVersion: scriptMeta.version
                 });
             });
 
-            emit('info', 'COMMUNITY', 'Script updated successfully', { scriptId, newVersion: scriptMeta.version });
+            Logger.debug('COMMUNITY', 'Script updated successfully', { scriptId, newVersion: scriptMeta.version });
             new Notice(`✅ Updated to v${scriptMeta.version}`);
         });
     }

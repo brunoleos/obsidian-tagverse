@@ -249,29 +249,31 @@ export class ReadingModeRenderer extends TagRenderer {
         element: HTMLElement,
         context: MarkdownPostProcessorContext
     ): Promise<void> {
-        // Find all tag elements in the markdown
-        const tagElements = element.findAll('a.tag');
+        await Logger.withScope('📄 Process Markdown', async () => {
+            // Find all tag elements in the markdown
+            const tagElements = element.findAll('a.tag');
 
-        // Track how many tags are actually rendered (have mappings)
-        let renderedCount = 0;
+            // Track how many tags are actually rendered (have mappings)
+            let renderedCount = 0;
 
-        // Process all tags in parallel - each gets its own scoped logger from factory
-        const results = await Promise.all(
-            tagElements.map((tagElement, index) =>
-                this.processTagElement(tagElement, tagMapping, rendererFactory, context, index)
-            )
-        );
+            // Process all tags in parallel - each gets its own scoped logger from factory
+            const results = await Promise.all(
+                tagElements.map((tagElement, index) =>
+                    this.processTagElement(tagElement, tagMapping, rendererFactory, context, index)
+                )
+            );
 
-        // Count successful renders (filter out undefined results from unmatched tags)
-        renderedCount = results.filter(r => r === true).length;
+            // Count successful renders (filter out undefined results from unmatched tags)
+            renderedCount = results.filter(r => r === true).length;
 
-        // Log page render completion if any tags were rendered
-        if (renderedCount > 0) {
-            Logger.info('RENDER-READING', 'Page rendered successfully', {
-                tagCount: renderedCount,
-                sourcePath: context.sourcePath
-            });
-        }
+            // Log page render completion if any tags were rendered
+            if (renderedCount > 0) {
+                Logger.info('RENDER-READING', 'Page rendered successfully', {
+                    tagCount: renderedCount,
+                    sourcePath: context.sourcePath
+                });
+            }
+        });
     }
 
     /**
@@ -285,36 +287,45 @@ export class ReadingModeRenderer extends TagRenderer {
         context: MarkdownPostProcessorContext,
         index: number
     ): Promise<boolean> {
-        // Extract tag name early for matching
-        let tagName = tagElement.textContent?.trim();
-        if (!tagName) return false;
-        if (tagName.startsWith('#')) {
-            tagName = tagName.substring(1);
-        }
+        return await Logger.withScope('🔍 Process Tag Element', async () => {
+            // Extract tag name early for matching
+            let tagName = tagElement.textContent?.trim();
+            if (!tagName) return false;
+            if (tagName.startsWith('#')) {
+                tagName = tagName.substring(1);
+            }
 
-        // Find matching script mapping
-        const mapping = tagMapping.getMapping(tagName);
+            // Find matching script mapping
+            const mapping = tagMapping.getMapping(tagName);
 
-        if (mapping) {
-            // Extract full tag info with arguments
-            const { tag, args } = this.extractTagInfoFromElement(tagElement);
+            if (mapping) {
+                // Extract full tag info with arguments
+                const { tag, args } = this.extractTagInfoFromElement(tagElement);
 
-            // Create renderer with scoped logger (factory creates logger)
-            const renderer = rendererFactory.createReadingModeRenderer(
-                mapping.tag,
-                mapping,
-                context.sourcePath,
-                tagElement,
-                args,
-                context.docId,
-                index
-            );
+                Logger.debug('RENDER-READING', `Mapping found for ${tagName}`, {
+                    tag: mapping.tag,
+                    script: mapping.scriptPath,
+                    args: args
+                });
 
-            // Render (renderer has its own scoped logger and will flush)
-            await renderer.render(context.frontmatter);
-            return true;
-        }
-        // No mapping - silently skip (no logging needed for unmatched tags)
-        return false;
+                // Create renderer with scoped logger (factory creates logger)
+                const renderer = rendererFactory.createReadingModeRenderer(
+                    mapping.tag,
+                    mapping,
+                    context.sourcePath,
+                    tagElement,
+                    args,
+                    context.docId,
+                    index
+                );
+
+                // Render (renderer has its own scoped logger and will flush)
+                await renderer.render(context.frontmatter);
+                return true;
+            }
+            // No mapping - silently skip (no logging needed for unmatched tags)
+            Logger.debug('RENDER-READING', `No mapping for ${tagName}, skipping render`);
+            return false;
+        });
     }
 }

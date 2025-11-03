@@ -131,10 +131,8 @@ export default class TagversePlugin extends Plugin {
                                     filePath: file?.path || 'unknown',
                                     refreshOnFileChange: this.settings.refreshOnFileChange
                                 });
-                                await Logger.withScope('🔄 Refresh Tags', async () => {
-                                    this.refreshActiveView();
-                                    Logger.debug('PLUGIN-EVENT', 'Tag refresh completed');
-                                });
+
+                                await this.refreshActiveView();
                             });
                         }
                     })
@@ -143,13 +141,7 @@ export default class TagversePlugin extends Plugin {
                 // Register event for layout changes to detect mode switches
                 this.registerEvent(
                     this.app.workspace.on('layout-change', async () => {
-                        await Logger.withScope('🔄 Layout Changed', async () => {
-                            Logger.debug('PLUGIN-EVENT', 'Layout change detected');
-                            await Logger.withScope('🔍 Check Mode Change', async () => {
-                                this.checkForModeChange();
-                                Logger.debug('PLUGIN-EVENT', 'Mode change check completed');
-                            });
-                        });
+                        await this.checkForModeChange();
                     })
                 );
                 Logger.debug('PLUGIN-INIT', 'Event handlers registered', {
@@ -168,10 +160,7 @@ export default class TagversePlugin extends Plugin {
                     callback: async () => {
                         await Logger.withScope('🔄 Manual Refresh', async () => {
                             Logger.debug('PLUGIN-COMMAND', 'Manual refresh command executed');
-                            await Logger.withScope('🔄 Refresh Tags', async () => {
-                                this.refreshActiveView();
-                                Logger.debug('PLUGIN-COMMAND', 'Tag refresh completed');
-                            });
+                            await this.refreshActiveView();
                             new Notice('Tagverses refreshed');
                             Logger.info('PLUGIN-COMMAND', 'Manual refresh completed');
                         });
@@ -253,10 +242,7 @@ export default class TagversePlugin extends Plugin {
             });
 
             // Refresh active view
-            await Logger.withScope('🔄 Refresh View', async () => {
-                this.refreshActiveView();
-                Logger.debug('PLUGIN-SETTINGS', 'Active view refreshed');
-            });
+            await this.refreshActiveView();
 
             Logger.info('PLUGIN-SETTINGS', 'Settings change handling completed');
         });
@@ -265,46 +251,57 @@ export default class TagversePlugin extends Plugin {
     /**
      * Check if the active view's mode has changed and refresh if needed
      */
-    private checkForModeChange(): void {
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (activeView) {
-            const currentMode = activeView.getMode();
+    private async checkForModeChange(): Promise<void> {
+        await Logger.withScope('🔄 Layout Changed', async () => {
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView) {
+                const currentMode = activeView.getMode();
 
-            // Check if mode changed
-            if (this.lastActiveViewMode !== null && this.lastActiveViewMode !== currentMode) {
-                this.refreshActiveView();
+                // Check if mode changed
+                if (this.lastActiveViewMode !== null && this.lastActiveViewMode !== currentMode) {
+                    Logger.info('PLUGIN-EVENT', `Mode change detected: ${this.lastActiveViewMode} -> ${currentMode}`);
+                    await this.refreshActiveView();
+                }
+
+                // Update last known mode
+                this.lastActiveViewMode = currentMode;
             }
 
-            // Update last known mode
-            this.lastActiveViewMode = currentMode;
-        }
+            Logger.debug('PLUGIN-EVENT', 'Mode change check completed');
+        });     
     }
 
-    private refreshActiveView() {
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-            const currentMode = view.getMode();
-            if (currentMode === 'preview') {
-                // Force re-render in reading mode
-                view.previewMode.rerender(true);
-            } else if (currentMode === 'source') {
-                // Force complete live preview decoration rebuild
-                try {
-                    // Access CodeMirror EditorView (this is implementation-specific but necessary)
-                    const cm = (view.editor as any).cm;
-                    if (cm) {
-                        // Dispatch enhanced transaction with user event to force visual update
-                        const transactionSpec = {
-                            effects: [LivePreviewRenderer.createInvalidateEffect()],
-                            userEvent: "invalidate"
-                        };
-                        cm.dispatch(transactionSpec);
+    private async refreshActiveView(): Promise<void> {
+        await Logger.withScope('🔄 Refresh Tags', async () => {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view) {
+                const currentMode = view.getMode();
+                if (currentMode === 'preview') {
+                    // Force re-render in reading mode
+                    Logger.debug('PLUGIN-EVENT', `Refreshing reading mode`);
+                    view.previewMode.rerender(true);
+                } else if (currentMode === 'source') {
+                    // Force complete live preview decoration rebuild
+                    Logger.debug('PLUGIN-EVENT', `Refreshing live preview`);
+                    try {
+                        // Access CodeMirror EditorView (this is implementation-specific but necessary)
+                        const cm = (view.editor as any).cm;
+                        if (cm) {
+                            // Dispatch enhanced transaction with user event to force visual update
+                            const transactionSpec = {
+                                effects: [LivePreviewRenderer.createInvalidateEffect()],
+                                userEvent: "invalidate"
+                            };
+                            cm.dispatch(transactionSpec);
+                        }
+                    } catch (error) {
+                        // If not live preview or CodeMirror not accessible, ignore silently
+                        Logger.warn('PLUGIN-EVENT', `Not live preview, or CodeMirror not accessible`);
                     }
-                } catch (error) {
-                    // If not live preview or CodeMirror not accessible, ignore silently
                 }
             }
-        }
+            Logger.info('PLUGIN-EVENT', 'Tag refresh completed');
+        });
     }
 
     /**

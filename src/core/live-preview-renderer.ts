@@ -28,8 +28,8 @@ export class LivePreviewRenderer extends TagRenderer {
         tag: string,
         mapping: TagScriptMapping,
         sourcePath: string,
-        private frontmatter: any,
-        private args: any = {}
+        private frontmatter: Record<string, unknown>,
+        private args: Record<string, unknown> = {}
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
         
@@ -64,7 +64,7 @@ export class LivePreviewRenderer extends TagRenderer {
     /**
      * Render the tag in live preview mode
      */
-    async render(frontmatter: any, args: any = {}): Promise<void> {
+    async render(frontmatter: Record<string, unknown>, args: Record<string, unknown> = {}): Promise<void> {
         if (this.rendered) return;
         this.rendered = true;
 
@@ -79,12 +79,12 @@ export class LivePreviewRenderer extends TagRenderer {
             const contentElement = this.processScriptResult(result);
 
             // Update container with rendered content
-            this.container!.innerHTML = '';
+            this.container!.empty();
             this.container!.appendChild(contentElement);
         } catch (error) {
             // Handle error
             const errorEl = this.handleError(error);
-            this.container!.innerHTML = '';
+            this.container!.empty();
             this.container!.appendChild(errorEl);
         }
     }
@@ -92,7 +92,7 @@ export class LivePreviewRenderer extends TagRenderer {
     /**
      * Process script result into an HTMLElement
      */
-    protected processScriptResult(result: any): HTMLElement {
+    protected processScriptResult(result: unknown): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan({ text: `#${this.tag}` });
             logger.logRenderPipeline('Output fallback to plain tag', {
@@ -104,8 +104,10 @@ export class LivePreviewRenderer extends TagRenderer {
 
         if (typeof result === 'string') {
             const stringEl = createSpan();
-            stringEl.innerHTML = result;
-            logger.logRenderPipeline('Output rendered as HTML string', {
+            // BREAKING CHANGE: Switched from innerHTML to textContent for security
+            // Scripts returning HTML strings should return HTMLElement instead
+            stringEl.textContent = result;
+            logger.logRenderPipeline('Output rendered as text string', {
                 tag: this.tag,
                 length: result.length
             });

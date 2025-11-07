@@ -10,7 +10,7 @@ export class Logger {
     private logLevel: 'debug' | 'info' | 'warning' | 'error' = 'error';
     private groupStack: string[] = [];
 
-    private formatMessageLazily(component: string, event: string, data?: any): string {
+    private formatMessageLazily(component: string, event: string, data?: unknown): string {
         const timestamp = new Date().toISOString().split('T')[1];
         const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
         return `${this.prefix} ${timestamp} | ${component} | ${event}${dataStr}`;
@@ -25,7 +25,7 @@ export class Logger {
         return levels.indexOf(level) >= levels.indexOf(this.logLevel);
     }
 
-    private log(level: 'debug' | 'info' | 'warning' | 'error', component: string, event: string, data?: any) {
+    private log(level: 'debug' | 'info' | 'warning' | 'error', component: string, event: string, data?: unknown) {
         if (!this.shouldLog(level)) return;
 
         const message = this.formatMessageLazily(component, event, data);
@@ -45,24 +45,24 @@ export class Logger {
         }
     }
 
-    debug(component: string, event: string, data?: any) {
+    debug(component: string, event: string, data?: unknown) {
         this.log('debug', component, event, data);
     }
 
-    info(component: string, event: string, data?: any) {
+    info(component: string, event: string, data?: unknown) {
         this.log('info', component, event, data);
     }
 
-    warn(component: string, event: string, data?: any) {
+    warn(component: string, event: string, data?: unknown) {
         this.log('warning', component, event, data);
     }
 
-    error(component: string, event: string, error: any) {
-        this.log('error', component, event, { error: error.message || error });
+    error(component: string, event: string, error: unknown) {
+        this.log('error', component, event, { error: (error as Error).message || error });
     }
 
     // Grouped logging methods that respect log levels
-    startGroup(component: string, event: string, data?: any) {
+    startGroup(component: string, event: string, data?: unknown) {
         if (this.shouldLog('debug')) {
             const message = this.formatMessageLazily(component, event, data);
             console.group(message);
@@ -78,35 +78,35 @@ export class Logger {
     }
 
     // Convenience methods for common logging patterns
-    logPluginInit(event: string, data?: any) {
+    logPluginInit(event: string, data?: unknown) {
         this.info('PLUGIN-INIT', event, data);
     }
 
-    logWidgetLifecycle(event: string, data?: any) {
+    logWidgetLifecycle(event: string, data?: unknown) {
         this.debug('WIDGET', event, data);
     }
 
-    logRenderPipeline(event: string, data?: any) {
+    logRenderPipeline(event: string, data?: unknown) {
         this.debug('RENDER-PIPELINE', event, data);
     }
 
-    logScriptExecution(event: string, data?: any) {
+    logScriptExecution(event: string, data?: unknown) {
         this.debug('SCRIPT-EXEC', event, data);
     }
 
-    logCacheOperation(event: string, data?: any) {
+    logCacheOperation(event: string, data?: unknown) {
         this.debug('SCRIPT-CACHE', event, data);
     }
 
-    logTagMatching(event: string, data?: any) {
+    logTagMatching(event: string, data?: unknown) {
         this.debug('TAG-MATCH', event, data);
     }
 
-    logUserAction(event: string, data?: any) {
+    logUserAction(event: string, data?: unknown) {
         this.info('USER-ACTION', event, data);
     }
 
-    logErrorHandling(event: string, error?: any) {
+    logErrorHandling(event: string, error?: unknown) {
         this.error('ERROR-HANDLING', event, error);
     }
 }

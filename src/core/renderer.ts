@@ -34,13 +34,13 @@ export abstract class TagRenderer {
     /**
      * Render the tag with the provided frontmatter
      */
-    abstract render(frontmatter: any): Promise<void>;
+    abstract render(frontmatter: Record<string, unknown>): Promise<void>;
 
     protected async loadScript(scriptPath: string): Promise<Function> {
         return this.scriptLoader.loadScript(scriptPath, this.app);
     }
 
-    protected createScriptContext(frontmatter: any, args: any = {}): ScriptContext {
+    protected createScriptContext(frontmatter: Record<string, unknown>, args: Record<string, unknown> = {}): ScriptContext {
         return {
             app: this.app,
             tag: this.tag,
@@ -52,12 +52,12 @@ export abstract class TagRenderer {
         };
     }
 
-    protected logScriptResult(result: any) {
+    protected logScriptResult(result: unknown) {
         if (result instanceof HTMLElement) {
             logger.logScriptExecution('Script returned HTMLElement', {
                 tag: this.tag,
                 elementType: result.tagName,
-                hasContent: result.innerHTML.length > 0,
+                hasContent: result.hasChildNodes(),
                 classes: result.className
             });
         } else if (typeof result === 'string') {
@@ -78,7 +78,7 @@ export abstract class TagRenderer {
     /**
      * Execute the tag script and return the result
      */
-    protected async executeScript(frontmatter: any, args: any = {}): Promise<any> {
+    protected async executeScript(frontmatter: Record<string, unknown>, args: Record<string, unknown> = {}): Promise<unknown> {
         const groupName = this.getMode() === 'live-preview' ? 'RENDER-LIVE' : 'RENDER-READING';
         const modeName = this.getMode() === 'live-preview' ? 'Widget' : 'Reading';
 
@@ -120,7 +120,7 @@ export abstract class TagRenderer {
     /**
      * Process script result into an HTMLElement
      */
-    protected abstract processScriptResult(result: any): HTMLElement;
+    protected abstract processScriptResult(result: unknown): HTMLElement;
 
     /**
      * Handle rendering errors

@@ -14,6 +14,19 @@ import { SettingsService } from '../services/settings.service';
 import { RendererFactoryService } from '../services/renderer-factory.service';
 import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../services/interfaces';
 
+/**
+ * Interface for accessing internal CodeMirror instance
+ * This is not part of the official Obsidian API but is needed for live preview invalidation
+ */
+interface EditorWithCodeMirror {
+    cm?: {
+        dispatch: (spec: {
+            effects?: unknown[];
+            userEvent?: string;
+        }) => void;
+    };
+}
+
 export let TagversePluginInstance: TagversePlugin | null = null;
 
 /**
@@ -196,7 +209,7 @@ export default class TagversePlugin extends Plugin {
                 // Force complete live preview decoration rebuild
                 try {
                     // Access CodeMirror EditorView (this is implementation-specific but necessary)
-                    const cm = (view.editor as any).cm;
+                    const cm = (view.editor as EditorWithCodeMirror).cm;
                     if (cm) {
                         // Dispatch enhanced transaction with user event to force visual update
                         const transactionSpec = {

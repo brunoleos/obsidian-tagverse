@@ -61,3 +61,5 @@ Thumbs.db
 # yarn.lock
 # pnpm-lock.yaml
 .claude/settings.local.json
+.kilocode/mcp.json
+.kilocodemodes

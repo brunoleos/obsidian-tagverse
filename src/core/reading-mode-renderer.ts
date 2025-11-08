@@ -8,7 +8,7 @@ import { TagParser } from '../utils/tag-parser';
 import { REGEX_PATTERNS } from '../constants';
 
 declare global {
-    function createSpan(attrs?: any): HTMLSpanElement;
+    function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;
 }
 
 /**

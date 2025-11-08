@@ -1,4 +1,4 @@
-import { WidgetType, ViewPlugin } from '@codemirror/view';
+import { WidgetType, ViewPlugin, PluginValue, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
 import { logger } from '../utils/logger';
@@ -10,8 +10,18 @@ import { TagMatchingService } from '../services/tag-matching.service';
 import { LivePreviewCodeMirrorExtension } from './live-preview-codemirror-extension';
 import { RendererFactoryService } from '../services/renderer-factory.service';
 
+/**
+ * Interface for the Tagverse ViewPlugin value
+ * Extends PluginValue to satisfy CodeMirror's type constraints
+ */
+interface TagverseViewPluginValue extends PluginValue {
+    decorations: DecorationSet;
+    update(update: ViewUpdate): void;
+    destroy?(): void;
+}
+
 declare global {
-    function createSpan(attrs?: any): HTMLSpanElement;
+    function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;
 }
 
 /**
@@ -38,9 +48,19 @@ export class LivePreviewRenderer extends TagRenderer {
         
         // Create widget type wrapper
         this._widgetType = new TagverseWidgetType(this);
-        
-        // Start async loading
-        this.render(frontmatter, args);
+
+        // Start async loading with error handling
+        this.render(frontmatter, args).catch((error) => {
+            logger.error('RENDER-LIVE', 'Failed to initialize renderer', {
+                tag: this.tag,
+                error: error instanceof Error ? error.message : String(error)
+            });
+            const errorEl = this.handleError(error);
+            if (this.container) {
+                this.container.empty();
+                this.container.appendChild(errorEl);
+            }
+        });
     }
 
     getMode(): 'live-preview' {
@@ -142,7 +162,7 @@ export class LivePreviewRenderer extends TagRenderer {
         app: App,
         tagMapping: ITagMappingProvider,
         rendererFactory: RendererFactoryService
-    ): [ViewPlugin<any>, StateField<number>] {
+    ): [ViewPlugin<TagverseViewPluginValue>, StateField<number>] {
         const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app);
         const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app);
         return extension.createExtension();

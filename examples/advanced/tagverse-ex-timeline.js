@@ -31,64 +31,69 @@ async function render(context) {
     }, {});
 
     // Render timeline
-    container.innerHTML = `
-        <div style="
-            padding: 16px;
-            background: var(--background-secondary);
-            border-radius: 12px;
-            max-height: 400px;
-            overflow-y: auto;
-        ">
-            <h4 style="margin: 0 0 16px 0;">📅 #${context.tag} Timeline</h4>
-            <div class="timeline">
-                ${Object.entries(byMonth).map(([month, monthEvents]) => {
-                    const date = monthEvents[0].date;
-                    const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-                    return `
-                        <div style="margin-bottom: 20px;">
-                            <div style="
-                                font-weight: 600;
-                                color: var(--interactive-accent);
-                                margin-bottom: 8px;
-                                padding-bottom: 4px;
-                                border-bottom: 2px solid var(--interactive-accent);
-                            ">
-                                ${monthName} (${monthEvents.length})
-                            </div>
-                            <div style="padding-left: 16px;">
-                                ${monthEvents.map(event => `
-                                    <div style="
-                                        padding: 6px 0;
-                                        border-left: 2px solid var(--background-modifier-border);
-                                        padding-left: 12px;
-                                        margin-bottom: 4px;
-                                    ">
-                                        <a href="${event.path}" class="internal-link">
-                                            ${event.title}
-                                        </a>
-                                        <span style="
-                                            font-size: 0.8em;
-                                            color: var(--text-muted);
-                                            margin-left: 8px;
-                                        ">
-                                            ${event.date.toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        </div>
+    const wrapper = container.createDiv();
+    wrapper.style.cssText = `
+        padding: 16px;
+        background: var(--background-secondary);
+        border-radius: 12px;
+        max-height: 400px;
+        overflow-y: auto;
     `;
 
-    // Add click listeners for internal links
-    container.querySelectorAll('a.internal-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            context.app.workspace.openLinkText(link.getAttribute('href'), '', false);
+    const heading = wrapper.createEl('h4');
+    heading.style.cssText = 'margin: 0 0 16px 0;';
+    heading.textContent = `📅 #${context.tag} Timeline`;
+
+    const timelineDiv = wrapper.createDiv({ cls: 'timeline' });
+
+    // Render each month group
+    Object.entries(byMonth).forEach(([month, monthEvents]) => {
+        const date = monthEvents[0].date;
+        const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        const monthGroup = timelineDiv.createDiv();
+        monthGroup.style.marginBottom = '20px';
+
+        const monthHeader = monthGroup.createDiv();
+        monthHeader.style.cssText = `
+            font-weight: 600;
+            color: var(--interactive-accent);
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid var(--interactive-accent);
+        `;
+        monthHeader.textContent = `${monthName} (${monthEvents.length})`;
+
+        const eventsContainer = monthGroup.createDiv();
+        eventsContainer.style.paddingLeft = '16px';
+
+        // Render each event
+        monthEvents.forEach(event => {
+            const eventDiv = eventsContainer.createDiv();
+            eventDiv.style.cssText = `
+                padding: 6px 0;
+                border-left: 2px solid var(--background-modifier-border);
+                padding-left: 12px;
+                margin-bottom: 4px;
+            `;
+
+            const link = eventDiv.createEl('a', {
+                cls: 'internal-link',
+                text: event.title
+            });
+            link.href = event.path;
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                context.app.workspace.openLinkText(event.path, '', false);
+            });
+
+            const dateSpan = eventDiv.createEl('span');
+            dateSpan.style.cssText = `
+                font-size: 0.8em;
+                color: var(--text-muted);
+                margin-left: 8px;
+            `;
+            dateSpan.textContent = event.date.toLocaleDateString();
         });
     });
 

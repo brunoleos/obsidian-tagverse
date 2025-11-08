@@ -31,39 +31,51 @@ async function render(context) {
     const recentlyModified = taggedFiles.sort((a, b) => b.modified - a.modified)[0];
 
     // Render dashboard
-    container.innerHTML = `
-        <div style="
-            padding: 16px;
-            background: var(--background-secondary);
-            border-radius: 12px;
-            border: 2px solid var(--interactive-accent);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        ">
-            <h4 style="margin: 0 0 12px 0; color: var(--interactive-accent);">
-                📊 #${context.tag} Statistics
-            </h4>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-                <div style="padding: 8px; background: var(--background-primary); border-radius: 6px;">
-                    <div style="font-size: 0.8em; color: var(--text-muted);">Total Notes</div>
-                    <div style="font-size: 1.5em; font-weight: bold;">${taggedFiles.length}</div>
-                </div>
-                <div style="padding: 8px; background: var(--background-primary); border-radius: 6px;">
-                    <div style="font-size: 0.8em; color: var(--text-muted);">Total Words</div>
-                    <div style="font-size: 1.5em; font-weight: bold;">${totalWords.toLocaleString()}</div>
-                </div>
-                <div style="padding: 8px; background: var(--background-primary); border-radius: 6px;">
-                    <div style="font-size: 0.8em; color: var(--text-muted);">Avg Words/Note</div>
-                    <div style="font-size: 1.5em; font-weight: bold;">${avgWords}</div>
-                </div>
-                <div style="padding: 8px; background: var(--background-primary); border-radius: 6px;">
-                    <div style="font-size: 0.8em; color: var(--text-muted);">Newest</div>
-                    <div style="font-size: 0.9em; font-weight: bold;">
-                        ${newest ? newest.file.basename : 'N/A'}
-                    </div>
-                </div>
-            </div>
-        </div>
+    const wrapper = container.createDiv();
+    wrapper.style.cssText = `
+        padding: 16px;
+        background: var(--background-secondary);
+        border-radius: 12px;
+        border: 2px solid var(--interactive-accent);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     `;
+
+    const heading = wrapper.createEl('h4');
+    heading.style.cssText = 'margin: 0 0 12px 0; color: var(--interactive-accent);';
+    heading.textContent = `📊 #${context.tag} Statistics`;
+
+    const grid = wrapper.createDiv();
+    grid.style.cssText = 'display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;';
+
+    // Helper function to create stat cards
+    const createStatCard = (label, value) => {
+        const card = grid.createDiv();
+        card.style.cssText = 'padding: 8px; background: var(--background-primary); border-radius: 6px;';
+
+        const labelDiv = card.createDiv();
+        labelDiv.style.cssText = 'font-size: 0.8em; color: var(--text-muted);';
+        labelDiv.textContent = label;
+
+        const valueDiv = card.createDiv();
+        valueDiv.style.cssText = 'font-size: 1.5em; font-weight: bold;';
+        valueDiv.textContent = value;
+    };
+
+    createStatCard('Total Notes', taggedFiles.length);
+    createStatCard('Total Words', totalWords.toLocaleString());
+    createStatCard('Avg Words/Note', avgWords);
+
+    // Newest card with different font size
+    const newestCard = grid.createDiv();
+    newestCard.style.cssText = 'padding: 8px; background: var(--background-primary); border-radius: 6px;';
+
+    const newestLabel = newestCard.createDiv();
+    newestLabel.style.cssText = 'font-size: 0.8em; color: var(--text-muted);';
+    newestLabel.textContent = 'Newest';
+
+    const newestValue = newestCard.createDiv();
+    newestValue.style.cssText = 'font-size: 0.9em; font-weight: bold;';
+    newestValue.textContent = newest ? newest.file.basename : 'N/A';
 
     return container;
 }

@@ -1,10 +1,4 @@
 // ========== LOGGER UTILITY ==========
-export interface TagScriptMapping {
-    tag: string;
-    scriptPath: string;
-    enabled: boolean;
-}
-
 export class Logger {
     private prefix = '[TAGVERSE]';
     private logLevel: 'debug' | 'info' | 'warning' | 'error' = 'error';
@@ -31,10 +25,11 @@ export class Logger {
         const message = this.formatMessageLazily(component, event, data);
         switch (level) {
             case 'debug':
-                console.log(message);
+                console.debug(message);
                 break;
             case 'info':
-                console.info(message);
+                // Use console.debug for info level (only warn/error/debug allowed by Obsidian)
+                console.debug(message);
                 break;
             case 'warning':
                 console.warn(message);
@@ -62,18 +57,21 @@ export class Logger {
     }
 
     // Grouped logging methods that respect log levels
+    // Note: Uses console.debug with indentation instead of console.group (not allowed by Obsidian)
     startGroup(component: string, event: string, data?: unknown) {
         if (this.shouldLog('debug')) {
+            const indent = '  '.repeat(this.groupStack.length);
             const message = this.formatMessageLazily(component, event, data);
-            console.group(message);
+            console.debug(`${indent}▼ ${message}`);
             this.groupStack.push(`${component}:${event}`);
         }
     }
 
     endGroup() {
         if (this.groupStack.length > 0 && this.shouldLog('debug')) {
-            console.groupEnd();
             this.groupStack.pop();
+            const indent = '  '.repeat(this.groupStack.length);
+            console.debug(`${indent}▲`);
         }
     }
 

@@ -30,6 +30,14 @@ interface EditorWithCodeMirror {
 export let TagversePluginInstance: TagversePlugin | null = null;
 
 /**
+ * Sets the global plugin instance
+ * This helper function avoids ESLint's no-this-alias warning
+ */
+function setPluginInstance(instance: TagversePlugin | null): void {
+    TagversePluginInstance = instance;
+}
+
+/**
  * Main plugin class for Tagverse
  */
 export default class TagversePlugin extends Plugin {
@@ -50,7 +58,8 @@ export default class TagversePlugin extends Plugin {
     async onload() {
         logger.logPluginInit('Plugin initialization started');
 
-        TagversePluginInstance = this;
+        // Store plugin instance globally for access from other modules
+        setPluginInstance(this);
 
         // Initialize services
         this.initializeServices();
@@ -67,7 +76,7 @@ export default class TagversePlugin extends Plugin {
         this.tagMapping.rebuildMappings(this.settings.tagMappings);
 
         // Setup settings change handler
-        this.settingsService.onSettingsChanged((settings) => {
+        this.settingsService.onSettingsChanged(() => {
             this.onSettingsChanged();
         });
 
@@ -94,7 +103,7 @@ export default class TagversePlugin extends Plugin {
 
         // Register event for file changes if enabled
         this.registerEvent(
-            this.app.workspace.on('file-open', (file) => {
+            this.app.workspace.on('file-open', () => {
                 if (this.settings.refreshOnFileChange) {
                     this.refreshActiveView();
                 }
@@ -115,7 +124,7 @@ export default class TagversePlugin extends Plugin {
         // Add command to refresh current view
         this.addCommand({
             id: 'refresh-dynamic-tags',
-            name: 'Refresh tagverses in current note',
+            name: 'Refresh in current note',
             callback: () => {
                 logger.logUserAction('Refresh tagverses command executed');
                 this.refreshActiveView();
@@ -138,7 +147,7 @@ export default class TagversePlugin extends Plugin {
     }
 
     onunload() {
-        TagversePluginInstance = null;
+        setPluginInstance(null);
         this.scriptLoader.clearCache();
         logger.logPluginInit('Plugin unloaded successfully');
     }

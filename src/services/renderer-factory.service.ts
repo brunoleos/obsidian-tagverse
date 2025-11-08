@@ -3,6 +3,7 @@ import { TagScriptMapping } from '../types/interfaces';
 import { IScriptLoader } from './interfaces';
 import { LivePreviewRenderer } from '../core/live-preview-renderer';
 import { ReadingModeRenderer } from '../core/reading-mode-renderer';
+import { TagArguments } from '../utils/tag-parser';
 
 /**
  * Factory service for creating renderer instances.
@@ -22,8 +23,8 @@ export class RendererFactoryService {
         tag: string,
         mapping: TagScriptMapping,
         sourcePath: string,
-        frontmatter: any,
-        args: any = {}
+        frontmatter: Record<string, unknown>,
+        args: TagArguments = {}
     ): LivePreviewRenderer {
         return new LivePreviewRenderer(
             this.scriptLoader,
@@ -44,7 +45,7 @@ export class RendererFactoryService {
         mapping: TagScriptMapping,
         sourcePath: string,
         targetElement: HTMLElement,
-        args: any = {}
+        args: TagArguments = {}
     ): ReadingModeRenderer {
         return new ReadingModeRenderer(
             this.scriptLoader,

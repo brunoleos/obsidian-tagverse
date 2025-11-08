@@ -16,34 +16,42 @@ async function render(context) {
     const percentage = Math.round((taggedCount / total) * 100);
 
     const container = context.element.createDiv();
-    container.innerHTML = `
-        <div style="
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            background: var(--background-secondary);
-            border-radius: 8px;
-            font-size: 0.85em;
-        ">
-            <span style="font-weight: 600;">#${context.tag}</span>
-            <div style="
-                width: 100px;
-                height: 8px;
-                background: var(--background-modifier-border);
-                border-radius: 4px;
-                overflow: hidden;
-            ">
-                <div style="
-                    width: ${percentage}%;
-                    height: 100%;
-                    background: linear-gradient(90deg, var(--interactive-accent), var(--interactive-accent-hover));
-                    transition: width 0.3s ease;
-                "></div>
-            </div>
-            <span style="color: var(--text-muted);">${taggedCount}/${total}</span>
-        </div>
+
+    const wrapper = container.createDiv();
+    wrapper.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: var(--background-secondary);
+        border-radius: 8px;
+        font-size: 0.85em;
     `;
+
+    const tagSpan = wrapper.createEl('span');
+    tagSpan.style.fontWeight = '600';
+    tagSpan.textContent = `#${context.tag}`;
+
+    const progressBarContainer = wrapper.createDiv();
+    progressBarContainer.style.cssText = `
+        width: 100px;
+        height: 8px;
+        background: var(--background-modifier-border);
+        border-radius: 4px;
+        overflow: hidden;
+    `;
+
+    const progressBar = progressBarContainer.createDiv();
+    progressBar.style.cssText = `
+        width: ${percentage}%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--interactive-accent), var(--interactive-accent-hover));
+        transition: width 0.3s ease;
+    `;
+
+    const countSpan = wrapper.createEl('span');
+    countSpan.style.color = 'var(--text-muted)';
+    countSpan.textContent = `${taggedCount}/${total}`;
 
     return container;
 }

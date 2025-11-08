@@ -1,13 +1,13 @@
 import { Decoration } from '@codemirror/view';
 import { App } from 'obsidian';
-import { TagScriptMapping } from '../types/interfaces';
 import { ITagMappingProvider } from './interfaces';
 import { RendererFactoryService } from './renderer-factory.service';
 import { logger } from '../utils/logger';
+import { TagArguments } from '../utils/tag-parser';
 
 export interface MatchContext {
     tag: string;
-    args: any;
+    args: TagArguments;
     isLivePreview: boolean;
     cursorInside: boolean;
     position: number;
@@ -61,7 +61,7 @@ export class TagMatchingService {
     /**
      * Creates a widget decoration for a tag
      */
-    createWidgetDecoration(tag: string, args: any, context: MatchContext): Decoration {
+    createWidgetDecoration(tag: string, args: TagArguments): Decoration {
         const mapping = this.tagMapping.getMapping(tag);
         if (!mapping) {
             throw new Error(`No mapping found for tag ${tag}`);

@@ -27,7 +27,7 @@ async function render(context) {
     `;
 
     const searchBtn = inputContainer.createEl('button', {
-        text: '🔍 Search',
+        text: '🔍 search',
         cls: 'search-btn'
     });
     searchBtn.style.cssText = `

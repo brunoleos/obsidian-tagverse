@@ -4,7 +4,8 @@ import {
     EditorView,
     ViewPlugin,
     ViewUpdate,
-    MatchDecorator
+    MatchDecorator,
+    PluginValue
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
 import { StateField } from '@codemirror/state';
@@ -13,6 +14,16 @@ import { TagMappingStateManager } from './live-preview-state';
 import { logger } from '../utils/logger';
 import { TagParser } from '../utils/tag-parser';
 import { REGEX_PATTERNS } from '../constants';
+
+/**
+ * Interface for the Tagverse ViewPlugin value
+ * Extends PluginValue to satisfy CodeMirror's type constraints
+ */
+interface TagverseViewPluginValue extends PluginValue {
+    decorations: DecorationSet;
+    update(update: ViewUpdate): void;
+    destroy?(): void;
+}
 
 /**
  * Handles CodeMirror extension setup for live preview tag rendering
@@ -26,7 +37,7 @@ export class LivePreviewCodeMirrorExtension {
     /**
      * Creates the CodeMirror extension for live preview
      */
-    createExtension(): [ViewPlugin<any>, any] {
+    createExtension(): [ViewPlugin<TagverseViewPluginValue>, StateField<number>] {
         const matchDecorator = this.createMatchDecorator();
 
         const livePreviewPlugin = ViewPlugin.fromClass(class {
@@ -54,7 +65,7 @@ export class LivePreviewCodeMirrorExtension {
 
                 if (Object.values(reasons).some(Boolean)) {
                     const reasonStr = Object.entries(reasons)
-                        .filter(([_, value]) => value)
+                        .filter(([, value]) => value)
                         .map(([key]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
                         .join(', ');
 
@@ -105,7 +116,7 @@ export class LivePreviewCodeMirrorExtension {
                 };
 
                 if (this.tagMatchingService.shouldCreateWidget(context)) {
-                    return this.tagMatchingService.createWidgetDecoration(tag, args, context);
+                    return this.tagMatchingService.createWidgetDecoration(tag, args);
                 }
 
                 return null;

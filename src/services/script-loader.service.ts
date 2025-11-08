@@ -1,6 +1,6 @@
 import { App, TFile } from 'obsidian';
 import { logger } from '../utils/logger';
-import { IScriptLoader } from './interfaces';
+import { IScriptLoader, TagRenderFunction } from './interfaces';
 
 /**
  * Service for loading and caching user scripts from the vault.
@@ -30,7 +30,7 @@ import { IScriptLoader } from './interfaces';
  * - The plugin does not sandbox or restrict script execution
  */
 export class ScriptLoaderService implements IScriptLoader {
-    private scriptCache: Map<string, Function> = new Map();
+    private scriptCache: Map<string, TagRenderFunction> = new Map();
 
     /**
      * Load and cache a script from the vault.
@@ -43,7 +43,7 @@ export class ScriptLoaderService implements IScriptLoader {
      * @security Uses Function constructor to dynamically load scripts.
      * See class-level documentation for security model details.
      */
-    async loadScript(scriptPath: string, app: App): Promise<Function> {
+    async loadScript(scriptPath: string, app: App): Promise<TagRenderFunction> {
         // Check cache first
         if (this.scriptCache.has(scriptPath)) {
             logger.logCacheOperation('Cache hit', { script: scriptPath });

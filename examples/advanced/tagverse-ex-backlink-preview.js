@@ -6,55 +6,56 @@ async function render(context) {
     const backlinks = await getRecentBacklinks(context);
 
     const container = context.element.createEl('div');
-    container.innerHTML = `
-        <div style="
-            padding: 10px;
-            background: var(--background-secondary);
-            border-radius: 8px;
-            border: 1px solid var(--background-modifier-border);
-            max-width: 300px;
-        ">
-            <div style="font-weight: 600; margin-bottom: 8px; color: var(--interactive-accent);">
-                🔗 Backlinks (${backlinks.length})
-            </div>
-            <div style="max-height: 200px; overflow-y: auto;">
-                ${backlinks.slice(0, 5).map(link => `
-                    <div style="
-                        padding: 6px;
-                        margin-bottom: 4px;
-                        background: var(--background-primary);
-                        border-radius: 4px;
-                        border-left: 3px solid var(--interactive-accent);
-                        cursor: pointer;
-                    "
-                    data-source-path="${link.sourcePath}">
-                        <div style="font-size: 0.9em; font-weight: 500; color: var(--text-normal);">
-                            ${link.sourceName}
-                        </div>
-                        <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 2px;">
-                            ${link.contextSnippet}
-                        </div>
-                    </div>
-                `).join('')}
-                ${backlinks.length > 5 ? `
-                    <div style="text-align: center; padding: 4px; color: var(--text-muted); font-size: 0.8em;">
-                        ... and ${backlinks.length - 5} more
-                    </div>
-                ` : ''}
-            </div>
-        </div>
+
+    const wrapper = container.createDiv();
+    wrapper.style.cssText = `
+        padding: 10px;
+        background: var(--background-secondary);
+        border-radius: 8px;
+        border: 1px solid var(--background-modifier-border);
+        max-width: 300px;
     `;
 
-    // Add click event listeners for backlink navigation
-    const backlinkItems = container.querySelectorAll('[data-source-path]');
-    backlinkItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            const sourcePath = item.getAttribute('data-source-path');
-            if (sourcePath) {
-                context.app.workspace.openLinkText(sourcePath, '', false);
-            }
+    const headerDiv = wrapper.createDiv();
+    headerDiv.style.cssText = 'font-weight: 600; margin-bottom: 8px; color: var(--interactive-accent);';
+    headerDiv.textContent = `🔗 Backlinks (${backlinks.length})`;
+
+    const listContainer = wrapper.createDiv();
+    listContainer.style.cssText = 'max-height: 200px; overflow-y: auto;';
+
+    // Add backlink items
+    backlinks.slice(0, 5).forEach(link => {
+        const itemDiv = listContainer.createDiv();
+        itemDiv.style.cssText = `
+            padding: 6px;
+            margin-bottom: 4px;
+            background: var(--background-primary);
+            border-radius: 4px;
+            border-left: 3px solid var(--interactive-accent);
+            cursor: pointer;
+        `;
+        itemDiv.setAttribute('data-source-path', link.sourcePath);
+
+        const titleDiv = itemDiv.createDiv();
+        titleDiv.style.cssText = 'font-size: 0.9em; font-weight: 500; color: var(--text-normal);';
+        titleDiv.textContent = link.sourceName;
+
+        const snippetDiv = itemDiv.createDiv();
+        snippetDiv.style.cssText = 'font-size: 0.8em; color: var(--text-muted); margin-top: 2px;';
+        snippetDiv.textContent = link.contextSnippet;
+
+        // Add click handler
+        itemDiv.addEventListener('click', () => {
+            context.app.workspace.openLinkText(link.sourcePath, '', false);
         });
     });
+
+    // Add "more" message if needed
+    if (backlinks.length > 5) {
+        const moreDiv = listContainer.createDiv();
+        moreDiv.style.cssText = 'text-align: center; padding: 4px; color: var(--text-muted); font-size: 0.8em;';
+        moreDiv.textContent = `... and ${backlinks.length - 5} more`;
+    }
 
     return container;
 }

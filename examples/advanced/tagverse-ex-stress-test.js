@@ -27,27 +27,30 @@ async function render(context) {
     const badge = container.createEl('span', {
         cls: 'stress-badge'
     });
-    badge.innerHTML = `
-        <span style="
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 12px;
-            background: linear-gradient(135deg, var(--interactive-accent), var(--interactive-accent-hover));
-            color: var(--text-on-accent);
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: 600;
-        ">
-            🧪 STRESS
-            <span style="
-                background: rgba(255,255,255,0.3);
-                padding: 2px 8px;
-                border-radius: 8px;
-                font-size: 0.9em;
-            ">TEST</span>
-        </span>
+
+    const badgeInner = badge.createEl('span');
+    badgeInner.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 12px;
+        background: linear-gradient(135deg, var(--interactive-accent), var(--interactive-accent-hover));
+        color: var(--text-on-accent);
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 600;
     `;
+
+    badgeInner.appendText('🧪 STRESS ');
+
+    const testLabel = badgeInner.createEl('span');
+    testLabel.style.cssText = `
+        background: rgba(255,255,255,0.3);
+        padding: 2px 8px;
+        border-radius: 8px;
+        font-size: 0.9em;
+    `;
+    testLabel.textContent = 'TEST';
 
     // Test 3: Multi-element horizontal layout
     const multiContainer = container.createEl('div', {

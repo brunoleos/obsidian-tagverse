@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, TFile, setIcon } from 'obsidian';
 import TagversePlugin from '../core/plugin';
-import { TagverseSettings, TagScriptMapping } from '../types/interfaces';
+import { TagScriptMapping } from '../types/interfaces';
 
 export class TagverseSettingTab extends PluginSettingTab {
     plugin: TagversePlugin;
@@ -14,7 +14,7 @@ export class TagverseSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Tagverse Settings' });
+        new Setting(containerEl).setHeading().setName('Tagverse settings');
 
         // General settings
         new Setting(containerEl)
@@ -22,31 +22,31 @@ export class TagverseSettingTab extends PluginSettingTab {
             .setDesc('Automatically refresh tagverses when opening a file')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.refreshOnFileChange)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     const settings = this.plugin.settings;
                     settings.refreshOnFileChange = value;
-                    await this.plugin.saveSettings(settings);
+                    void this.plugin.saveSettings(settings);
                 })
             );
 
         new Setting(containerEl)
-            .setName('Log Level')
-            .setDesc('Set the verbosity of logging. Default is Error.')
+            .setName('Log level')
+            .setDesc('Set the verbosity of logging. Default is error.')
             .addDropdown(dropdown => dropdown
                 .addOption('debug', 'Debug')
                 .addOption('info', 'Info')
                 .addOption('warning', 'Warning')
                 .addOption('error', 'Error')
                 .setValue(this.plugin.settings.logLevel)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     const settings = this.plugin.settings;
                     settings.logLevel = value as 'debug' | 'info' | 'warning' | 'error';
-                    await this.plugin.saveSettings(settings);
+                    void this.plugin.saveSettings(settings);
                 })
             );
 
         // Tag mappings section
-        containerEl.createEl('h3', { text: 'Tag-Script Mappings' });
+        new Setting(containerEl).setHeading().setName('Tag-script mappings');
 
         const desc = containerEl.createDiv({ cls: 'setting-item-description' });
 
@@ -58,10 +58,7 @@ export class TagverseSettingTab extends PluginSettingTab {
         const p2 = desc.createEl('p');
         const strong = p2.createEl('strong');
         strong.textContent = 'Script format:';
-        p2.appendText(' Each script should define a ');
-        const codeRender = p2.createEl('code');
-        codeRender.textContent = 'render(context)';
-        p2.appendText(' function that receives:');
+        p2.appendText(' Each script must export a render function that accepts a context parameter. The context provides:');
 
         // List of context properties
         const ul = desc.createEl('ul');
@@ -88,15 +85,16 @@ export class TagverseSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText('Add mapping')
                 .setCta()
-                .onClick(async () => {
+                .onClick(() => {
                     const settings = this.plugin.settings;
                     settings.tagMappings.push({
                         tag: '',
                         scriptPath: '',
                         enabled: true
                     });
-                    await this.plugin.saveSettings(settings);
-                    this.display();
+                    void this.plugin.saveSettings(settings).then(() => {
+                        this.display();
+                    });
                 })
             );
 
@@ -119,10 +117,10 @@ export class TagverseSettingTab extends PluginSettingTab {
                 value: mapping.tag,
                 cls: 'tag-input',
             });
-            tagInput.addEventListener('input', async (e) => {
+            tagInput.addEventListener('input', (e) => {
                 const settings = this.plugin.settings;
                 mapping.tag = (e.target as HTMLInputElement).value;
-                await this.plugin.saveSettings(settings);
+                void this.plugin.saveSettings(settings);
             });
 
             // Script dropdown - flexible width
@@ -133,10 +131,10 @@ export class TagverseSettingTab extends PluginSettingTab {
                 scriptSelect.createEl('option', { text: path, value: path });
             });
             scriptSelect.value = mapping.scriptPath;
-            scriptSelect.addEventListener('change', async (e) => {
+            scriptSelect.addEventListener('change', (e) => {
                 const settings = this.plugin.settings;
                 mapping.scriptPath = (e.target as HTMLSelectElement).value;
-                await this.plugin.saveSettings(settings);
+                void this.plugin.saveSettings(settings);
             });
 
             // Enable toggle - using Obsidian's native checkbox styling
@@ -146,12 +144,12 @@ export class TagverseSettingTab extends PluginSettingTab {
             });
 
             // Make the entire container clickable like Obsidian does
-            checkboxWrapper.addEventListener('click', async (e) => {
+            checkboxWrapper.addEventListener('click', (e) => {
                 e.preventDefault();
                 mapping.enabled = !mapping.enabled;
                 checkboxWrapper.className = 'checkbox-container' + (mapping.enabled ? ' is-enabled' : '');
                 const settings = this.plugin.settings;
-                await this.plugin.saveSettings(settings);
+                void this.plugin.saveSettings(settings);
             });
 
             // Delete button - fixed width, using trash icon style like other settings
@@ -165,11 +163,12 @@ export class TagverseSettingTab extends PluginSettingTab {
             setIcon(deleteButton, 'trash-2');
 
             // Add click event
-            deleteButton.addEventListener('click', async () => {
+            deleteButton.addEventListener('click', () => {
                 const settings = this.plugin.settings;
                 settings.tagMappings.splice(index, 1);
-                await this.plugin.saveSettings(settings);
-                this.display();
+                void this.plugin.saveSettings(settings).then(() => {
+                    this.display();
+                });
             });
         });
     }

@@ -1,10 +1,10 @@
 import { Notice, App } from 'obsidian';
 import { logger } from '../utils/logger';
 import { TagScriptMapping, ScriptContext } from '../types/interfaces';
-import { IScriptLoader } from '../services/interfaces';
+import { IScriptLoader, TagRenderFunction } from '../services/interfaces';
 
 declare global {
-    function createSpan(attrs?: any): HTMLSpanElement;
+    function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;
 }
 
 export abstract class TagRenderer {
@@ -36,7 +36,7 @@ export abstract class TagRenderer {
      */
     abstract render(frontmatter: Record<string, unknown>): Promise<void>;
 
-    protected async loadScript(scriptPath: string): Promise<Function> {
+    protected async loadScript(scriptPath: string): Promise<TagRenderFunction> {
         return this.scriptLoader.loadScript(scriptPath, this.app);
     }
 

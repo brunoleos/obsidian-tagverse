@@ -1,7 +1,7 @@
-import { App, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, PluginSettingTab, Setting, TFile, setIcon } from 'obsidian';
 import { Logger } from '../utils/logger';
 import TagversePlugin from '../core/plugin';
-import { TagverseSettings, TagScriptMapping } from '../types/interfaces';
+import { TagScriptMapping } from '../types/interfaces';
 import { CommunityScriptsTab } from './community-scripts-tab';
 import { ScriptSubmissionModal } from './script-submission-modal';
 import { LogCategory } from '../utils/logger';
@@ -18,7 +18,7 @@ export class TagverseSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Tagverse Settings' });
+        new Setting(containerEl).setHeading().setName('Tagverse settings');
 
         // Create tabs with proper ARIA attributes
         const tabsContainer = containerEl.createDiv({
@@ -196,7 +196,7 @@ export class TagverseSettingTab extends PluginSettingTab {
                         await Logger.withScope('💾 Save Settings', async () => {
                             const settings = this.plugin.settings;
                             settings.refreshOnFileChange = value;
-                            await this.plugin.saveSettings(settings);
+                            void this.plugin.saveSettings(settings);
                             Logger.debug( 'SETTINGS-UI', 'Settings saved');
                         });
                     });
@@ -204,8 +204,8 @@ export class TagverseSettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName('Log Level')
-            .setDesc('Set the verbosity of logging. Default is Error.')
+            .setName('Log level')
+            .setDesc('Set the verbosity of logging. Default is error.')
             .addDropdown(dropdown => dropdown
                 .addOption('debug', 'Debug')
                 .addOption('info', 'Info')
@@ -218,7 +218,7 @@ export class TagverseSettingTab extends PluginSettingTab {
                         await Logger.withScope('💾 Save Settings', async () => {
                             const settings = this.plugin.settings;
                             settings.logLevel = value as LogCategory;
-                            await this.plugin.saveSettings(settings);
+                            void this.plugin.saveSettings(settings);
                             Logger.debug( 'SETTINGS-UI', 'Settings saved');
                         });
                     });
@@ -226,21 +226,37 @@ export class TagverseSettingTab extends PluginSettingTab {
             );
 
         // Tag mappings section
-        containerEl.createEl('h3', { text: 'Tag-Script Mappings' });
+        new Setting(containerEl).setHeading().setName('Tag-script mappings');
 
         const desc = containerEl.createDiv({ cls: 'setting-item-description' });
-        desc.innerHTML = `
-            <p>Define which tags should be dynamically rendered and which scripts should render them.</p>
-            <p><strong>Script format:</strong> Each script should define a <code>render(context)</code> function that receives:</p>
-            <ul>
-                <li><code>context.app</code> - The Obsidian App instance</li>
-                <li><code>context.tag</code> - The tag name (without #)</li>
-                <li><code>context.element</code> - The container element for your rendered content</li>
-                <li><code>context.sourcePath</code> - The path of the current note</li>
-                <li><code>context.frontmatter</code> - The note's frontmatter data</li>
-                <li><code>context.Notice</code> - The Obsidian Notice constructor</li>
-            </ul>
-        `;
+
+        // First paragraph
+        const p1 = desc.createEl('p');
+        p1.textContent = 'Define which tags should be dynamically rendered and which scripts should render them.';
+
+        // Second paragraph with formatting
+        const p2 = desc.createEl('p');
+        const strong = p2.createEl('strong');
+        strong.textContent = 'Script format:';
+        p2.appendText(' Each script must export a render function that accepts a context parameter. The context provides:');
+
+        // List of context properties
+        const ul = desc.createEl('ul');
+        const contextItems = [
+            { prop: 'context.app', desc: 'The Obsidian App instance' },
+            { prop: 'context.tag', desc: 'The tag name (without #)' },
+            { prop: 'context.element', desc: 'The container element for your rendered content' },
+            { prop: 'context.sourcePath', desc: 'The path of the current note' },
+            { prop: 'context.frontmatter', desc: "The note's frontmatter data" },
+            { prop: 'context.Notice', desc: 'The Obsidian Notice constructor' }
+        ];
+
+        contextItems.forEach(item => {
+            const li = ul.createEl('li');
+            const code = li.createEl('code');
+            code.textContent = item.prop;
+            li.appendText(` - ${item.desc}`);
+        });
 
         // Add new mapping button
         new Setting(containerEl)
@@ -302,7 +318,7 @@ export class TagverseSettingTab extends PluginSettingTab {
                     await Logger.withScope('💾 Save Settings', async () => {
                         const settings = this.plugin.settings;
                         mapping.tag = newValue;
-                        await this.plugin.saveSettings(settings);
+                        void this.plugin.saveSettings(settings);
                         Logger.debug( 'SETTINGS-UI', 'Settings saved');
                     });
                 });
@@ -340,7 +356,7 @@ export class TagverseSettingTab extends PluginSettingTab {
                     await Logger.withScope('💾 Save Settings', async () => {
                         const settings = this.plugin.settings;
                         mapping.scriptPath = newValue;
-                        await this.plugin.saveSettings(settings);
+                        void this.plugin.saveSettings(settings);
                         Logger.debug( 'SETTINGS-UI', 'Settings saved');
                     });
                 });
@@ -362,7 +378,7 @@ export class TagverseSettingTab extends PluginSettingTab {
                         mapping.enabled = newValue;
                         checkboxWrapper.className = 'checkbox-container' + (newValue ? ' is-enabled' : '');
                         const settings = this.plugin.settings;
-                        await this.plugin.saveSettings(settings);
+                        void this.plugin.saveSettings(settings);
                         Logger.debug( 'SETTINGS-UI', 'Settings saved');
                     });
                 });
@@ -375,8 +391,8 @@ export class TagverseSettingTab extends PluginSettingTab {
                 attr: { 'aria-label': 'Delete mapping' },
             });
 
-            // Create the trash SVG icon using innerHTML since createEl doesn't support SVG
-            deleteButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+            // Use Obsidian's setIcon helper to add the trash icon
+            setIcon(deleteButton, 'trash-2');
 
             // Add click event
             deleteButton.addEventListener('click', async () => {
@@ -388,13 +404,14 @@ export class TagverseSettingTab extends PluginSettingTab {
                         Logger.debug( 'SETTINGS-UI', 'Mapping removed from settings');
                     });
                     await Logger.withScope('💾 Save Settings', async () => {
-                        await this.plugin.saveSettings(this.plugin.settings);
+                        void this.plugin.saveSettings(this.plugin.settings).then(() => {
                         Logger.debug( 'SETTINGS-UI', 'Settings saved');
                     });
                     await Logger.withScope('🔄 Re-render UI', async () => {
-                        this.display();
+                            this.display();
                         Logger.debug( 'SETTINGS-UI', 'Settings UI re-rendered');
                     });
+                });
                 });
             });
         });
@@ -403,7 +420,7 @@ export class TagverseSettingTab extends PluginSettingTab {
     private renderSubmitTab(container: HTMLElement): void {
         container.empty();
 
-        container.createEl('h2', { text: '🚀 Submit Your Script' });
+        new Setting(container).setHeading().setName('Submit your script');
         container.createDiv({
             text: 'Share your creations with the Tagverse community!',
             cls: 'setting-item-description'
@@ -413,7 +430,7 @@ export class TagverseSettingTab extends PluginSettingTab {
             .setName('Submit a script')
             .setDesc('Click to open the submission wizard')
             .addButton(btn => btn
-                .setButtonText('Start Submission')
+                .setButtonText('Start submission')
                 .setCta()
                 .onClick(async () => {
                     await Logger.withScope('🚀 Open Submission Modal', async () => {

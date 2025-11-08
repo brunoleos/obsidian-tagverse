@@ -11,10 +11,10 @@ export interface TagScriptMapping {
 export interface ScriptContext {
     app: App;
     tag: string;
-    args: any;
+    args: Record<string, unknown>;
     element: HTMLElement;
     sourcePath: string;
-    frontmatter: any;
+    frontmatter: Record<string, unknown>;
     Notice: typeof Notice;
 }
 
@@ -23,7 +23,7 @@ export interface ScriptArgument {
     name: string;
     type: string;
     description: string;
-    default?: any;
+    default?: unknown;
     required: boolean;
 }
 

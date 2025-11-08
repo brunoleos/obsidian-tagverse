@@ -196,7 +196,7 @@ export class CommunityScriptService implements ICommunityScriptService {
                     try {
                         await adapter.mkdir(folderPath);
                         Logger.debug('COMMUNITY', 'Created scripts folder', { folderPath });
-                    } catch (e) {
+                    } catch {
                         Logger.debug('COMMUNITY', 'Scripts folder already exists', { folderPath });
                     }
                 });
@@ -274,7 +274,7 @@ export class CommunityScriptService implements ICommunityScriptService {
             await this.saveSettings(settings);
 
             Logger.debug('COMMUNITY', 'Script uninstalled successfully', { scriptId });
-            new Notice(`✅ Uninstalled script`);
+            new Notice(`✅ uninstalled script`);
         });
     }
 

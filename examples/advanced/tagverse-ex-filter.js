@@ -27,11 +27,12 @@ async function render(context) {
 
     // Create filter UI
     const header = container.createDiv();
-    header.innerHTML = `
-        <div style="margin-bottom: 12px;">
-            <strong>#${context.tag}</strong> notes (${taggedNotes.length})
-        </div>
-    `;
+    const headerDiv = header.createDiv();
+    headerDiv.style.marginBottom = '12px';
+
+    const strong = headerDiv.createEl('strong');
+    strong.textContent = `#${context.tag}`;
+    headerDiv.appendText(` notes (${taggedNotes.length})`);
 
     // Add filter input
     const filterInput = container.createEl('input', {

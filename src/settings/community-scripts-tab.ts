@@ -19,7 +19,7 @@ export class CommunityScriptsTab {
         containerEl.empty();
 
         // Header
-        containerEl.createEl('h2', { text: '📚 Community Scripts' });
+        new Setting(containerEl).setHeading().setName('Community scripts');
         containerEl.createDiv({
             text: 'Browse and install scripts created by the community',
             cls: 'setting-item-description'
@@ -41,7 +41,7 @@ export class CommunityScriptsTab {
             // Script grid
             this.renderScriptGrid(containerEl);
 
-        } catch (error) {
+        } catch {
             loadingEl.setText('Failed to load community scripts. Check your internet connection.');
         }
     }
@@ -190,7 +190,7 @@ export class CommunityScriptsTab {
 
         if (installed) {
             // Already installed - show update/uninstall
-            actions.createEl('span', { text: '✓ Installed', cls: 'installed-badge' });
+            actions.createEl('span', { text: '✓ installed', cls: 'installed-badge' });
 
             // Check if update available
             if (installed.version !== script.version) {

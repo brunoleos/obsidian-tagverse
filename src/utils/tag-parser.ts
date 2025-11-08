@@ -1,9 +1,14 @@
 import { Logger } from './logger';
 import { REGEX_PATTERNS } from '../constants';
 
+/**
+ * Type representing tag arguments - can be any JSON-serializable value
+ */
+export type TagArguments = Record<string, unknown>;
+
 export interface ParsedTag {
     tag: string;
-    args: any;
+    args: TagArguments;
     fullMatch: string;
 }
 
@@ -58,7 +63,7 @@ export class TagParser {
      * @param argsString - The arguments string including braces (e.g., "{value: 75}")
      * @returns Parsed JavaScript object or empty object on error
      */
-    private static parseArguments(argsString: string): any {
+    private static parseArguments(argsString: string): TagArguments {
         try {
             // Remove outer braces
             let content = argsString.slice(1, -1).trim();
@@ -161,8 +166,8 @@ export class TagParser {
      * @param text - The text to search in
      * @returns Array of matches with tag info
      */
-    static extractTagsFromText(text: string): Array<{ match: string; tag: string; args: any; start: number; end: number }> {
-        const results: Array<{ match: string; tag: string; args: any; start: number; end: number }> = [];
+    static extractTagsFromText(text: string): Array<{ match: string; tag: string; args: TagArguments; start: number; end: number }> {
+        const results: Array<{ match: string; tag: string; args: TagArguments; start: number; end: number }> = [];
 
         // Match #tagname or #tagname{...} using the centralized regex
         const regex = REGEX_PATTERNS.TAG_ARGUMENT;

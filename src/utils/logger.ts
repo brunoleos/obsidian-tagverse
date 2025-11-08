@@ -15,7 +15,7 @@ interface LogEntry {
     type: LogCategory;
     component: string;
     event: string;
-    data?: any;
+    data?: unknown;
     timestamp: Date;
 }
 
@@ -64,7 +64,7 @@ class LoggerUtils {
     /**
      * Unified console output method
      */
-    public static outputToConsole(level: LogCategory, component: string, event: string, data: any): void {
+    public static outputToConsole(level: LogCategory, component: string, event: string, data: unknown): void {
         const message = `[TAGVERSE] ${component} | ${event}`;
 
         switch (level) {
@@ -83,11 +83,12 @@ class LoggerUtils {
                 }
                 break;
             case 'info':
-                console.info(message, data || '');
+                // Use console.debug for info level (only warn/error/debug allowed by Obsidian)
+                console.debug(message, data || '');
                 break;
             case 'debug':
             default:
-                console.log(message, data || '');
+                console.debug(message, data || '');
                 break;
         }
     }
@@ -120,7 +121,7 @@ class LogScope {
     /**
      * Add a log entry to this scope
      */
-    public addEntry(type: LogCategory, component: string, event: string, data?: any): void {
+    public addEntry(type: LogCategory, component: string, event: string, data?: unknown): void {
         this.entries.push({
             type,
             component,
@@ -222,28 +223,28 @@ export class Logger {
     /**
      * Log a debug message
      */
-    public static debug(component: string, event: string, data?: any): void {
+    public static debug(component: string, event: string, data?: unknown): void {
         Logger.emitLog('debug', component, event, data);
     }
 
     /**
      * Log an info message
      */
-    public static info(component: string, event: string, data?: any): void {
+    public static info(component: string, event: string, data?: unknown): void {
         Logger.emitLog('info', component, event, data);
     }
 
     /**
      * Log a warning message
      */
-    public static warn(component: string, event: string, data?: any): void {
+    public static warn(component: string, event: string, data?: unknown): void {
         Logger.emitLog('warning', component, event, data);
     }
 
     /**
      * Log an error message
      */
-    public static error(component: string, event: string, data?: any): void {
+    public static error(component: string, event: string, data?: unknown): void {
         Logger.emitLog('error', component, event, data);
     }
 
@@ -313,7 +314,7 @@ export class Logger {
     /**
      * Core logged implementation - handles level filtering and context dispatch
      */
-    private static emitLog(level: LogCategory, component: string, event: string, data?: any): void {
+    private static emitLog(level: LogCategory, component: string, event: string, data?: unknown): void {
         if (!this.shouldLog(level)) {
             return;
         }

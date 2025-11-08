@@ -1,6 +1,7 @@
 import { App, Modal, Notice, Setting, TFile } from 'obsidian';
 import { Logger } from '../utils/logger';
 import TagversePlugin from '../core/plugin';
+import { CommunityScriptMetadata, ScriptArgument } from '../types/interfaces';
 
 export class ScriptSubmissionModal extends Modal {
     private scriptPath = '';
@@ -22,7 +23,7 @@ export class ScriptSubmissionModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
-        contentEl.createEl('h2', { text: '🚀 Submit Script to Community' });
+        new Setting(contentEl).setHeading().setName('Submit script to community');
 
         contentEl.createDiv({
             text: 'Share your script with the Tagverse community!',
@@ -54,9 +55,9 @@ export class ScriptSubmissionModal extends Modal {
         // Metadata fields
         new Setting(contentEl)
             .setName('Script name')
-            .setDesc('Display name (e.g., "Task Counter")')
+            .setDesc('Display name (e.g., "task counter")')
             .addText(text => text
-                .setPlaceholder('My Awesome Script')
+                .setPlaceholder('My awesome script')
                 .onChange(value => {
                     Logger.withScope('✏️ Enter Script Name', () => {
                         Logger.debug( 'SUBMISSION-UI', 'Script name entered', { value });
@@ -82,7 +83,7 @@ export class ScriptSubmissionModal extends Modal {
             .setName('Labels')
             .setDesc('Comma-separated (e.g., "productivity, tasks, analytics")')
             .addText(text => text
-                .setPlaceholder('productivity, utilities')
+                .setPlaceholder('Productivity, utilities')
                 .onChange(value => {
                     Logger.withScope('🏷️ Enter Labels', () => {
                         const labels = value.split(',').map(l => l.trim()).filter(l => l);
@@ -96,7 +97,7 @@ export class ScriptSubmissionModal extends Modal {
             .setName('Suggested tag')
             .setDesc('Recommended tag name for users')
             .addText(text => text
-                .setPlaceholder('tasks')
+                .setPlaceholder('Tasks')
                 .onChange(value => {
                     Logger.withScope('🏷️ Enter Suggested Tag', () => {
                         Logger.debug( 'SUBMISSION-UI', 'Suggested tag entered', { value });
@@ -108,7 +109,7 @@ export class ScriptSubmissionModal extends Modal {
         new Setting(contentEl)
             .setName('Your name')
             .addText(text => text
-                .setPlaceholder('Your Name')
+                .setPlaceholder('Your name')
                 .onChange(value => {
                     Logger.withScope('👤 Enter Author Name', () => {
                         Logger.debug( 'SUBMISSION-UI', 'Author name entered', { value });
@@ -120,7 +121,7 @@ export class ScriptSubmissionModal extends Modal {
         new Setting(contentEl)
             .setName('GitHub username')
             .addText(text => text
-                .setPlaceholder('yourusername')
+                .setPlaceholder('Yourusername')
                 .onChange(value => {
                     Logger.withScope('🐙 Enter GitHub Username', () => {
                         Logger.debug( 'SUBMISSION-UI', 'GitHub username entered', { value });
@@ -141,7 +142,7 @@ export class ScriptSubmissionModal extends Modal {
         });
 
         const submitBtn = buttonContainer.createEl('button', {
-            text: 'Generate Submission',
+            text: 'Generate submission',
             cls: 'mod-cta'
         });
         submitBtn.addEventListener('click', async () => {
@@ -157,7 +158,7 @@ export class ScriptSubmissionModal extends Modal {
 
     private async generateSubmission(): Promise<void> {
         let scriptCode: string | undefined;
-        let manifest: any;
+        let manifest: CommunityScriptMetadata;
         let readme: string;
 
         await Logger.withScope('🔄 Generate Submission Process', async () => {
@@ -210,6 +211,15 @@ export class ScriptSubmissionModal extends Modal {
                         minTagverseVersion: "1.0.0",
                         labels: this.labels,
                         suggestedTag: this.suggestedTag,
+                        downloads: 0,
+                        featured: false,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        urls: {
+                            script: `https://raw.githubusercontent.com/brunoleos/tagverse-community-scripts/main/scripts/${scriptId}/script.js`,
+                            manifest: `https://raw.githubusercontent.com/brunoleos/tagverse-community-scripts/main/scripts/${scriptId}/manifest.json`,
+                            readme: `https://raw.githubusercontent.com/brunoleos/tagverse-community-scripts/main/scripts/${scriptId}/README.md`
+                        },
                         arguments: []
                     };
                     Logger.debug( 'SUBMISSION-UI', 'Manifest generated', { labels: this.labels.length });
@@ -217,7 +227,7 @@ export class ScriptSubmissionModal extends Modal {
 
                 // Generate README
                 await Logger.withScope('📝 Generate README', async () => {
-                    readme = this.generateReadme(scriptId, manifest, scriptCode!);
+                    readme = this.generateReadme(scriptId, manifest);
                     Logger.debug( 'SUBMISSION-UI', 'README generated', { length: readme.length });
                 });
 
@@ -261,7 +271,7 @@ export class ScriptSubmissionModal extends Modal {
         });
     }
 
-    private generateReadme(scriptId: string, manifest: any, scriptCode: string): string {
+    private generateReadme(scriptId: string, manifest: CommunityScriptMetadata): string {
         return `# ${manifest.name}
 
 ${manifest.description}
@@ -274,8 +284,8 @@ ${manifest.description}
 
 ## Arguments
 
-${manifest.arguments.length > 0 ?
-    manifest.arguments.map((arg: any) =>
+${manifest.arguments && manifest.arguments.length > 0 ?
+    manifest.arguments.map((arg: ScriptArgument) =>
         `- **${arg.name}** (${arg.type}): ${arg.description}`
     ).join('\n') :
     'No arguments required.'
@@ -321,7 +331,7 @@ ${this.labels.join(', ')}
 `;
     }
 
-    private formatForClipboard(data: any): string {
+    private formatForClipboard(data: { scriptId: string; manifest: string; scriptCode: string; readme: string }): string {
         return `
 📁 FOLDER STRUCTURE TO CREATE:
 scripts/${data.scriptId}/
@@ -352,7 +362,7 @@ All content has been copied to your clipboard!
         const modal = new Modal(this.app);
         const { contentEl } = modal;
 
-        contentEl.createEl('h2', { text: '📋 Submission Instructions' });
+        new Setting(contentEl).setHeading().setName('Submission instructions');
 
         const instructions = contentEl.createDiv({ cls: 'submission-instructions' });
         instructions.innerHTML = `

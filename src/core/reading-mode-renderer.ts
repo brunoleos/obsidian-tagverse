@@ -8,7 +8,7 @@ import { TagParser } from '../utils/tag-parser';
 import { REGEX_PATTERNS } from '../constants';
 
 declare global {
-    function createSpan(attrs?: any): HTMLSpanElement;
+    function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;
 }
 
 /**
@@ -26,7 +26,7 @@ export class ReadingModeRenderer extends TagRenderer {
         mapping: TagScriptMapping,
         sourcePath: string,
         targetElement: HTMLElement,
-        private args: any = {},
+        private args: Record<string, unknown> = {},
         private position?: number
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
@@ -40,7 +40,7 @@ export class ReadingModeRenderer extends TagRenderer {
     /**
      * Render the tag in reading mode by replacing the target element and cleaning up arguments text
      */
-    async render(frontmatter: any): Promise<void> {
+    async render(frontmatter: Record<string, unknown>): Promise<void> {
         await Logger.withScope('🎨 Render Tag', async () => {
             try {
                 await this.renderSuccessfully(frontmatter);
@@ -62,8 +62,8 @@ export class ReadingModeRenderer extends TagRenderer {
     /**
      * Execute successful rendering pipeline: script → DOM replacement → cleanup
      */
-    private async renderSuccessfully(frontmatter: any): Promise<void> {
-        // Execute script and create content (executeScript has its own nested scopes)
+    private async renderSuccessfully(frontmatter: Record<string, unknown>): Promise<void> {
+        // Execute script and create content
         const result = await this.executeScript(frontmatter, this.args);
 
         // Process the result with nested scope
@@ -99,8 +99,9 @@ export class ReadingModeRenderer extends TagRenderer {
     /**
      * Handle render errors with appropriate cleanup
      */
-    private handleRenderError(error: any): void {
-        const errorEl = this.handleError(error);
+    private handleRenderError(error: unknown): void {
+        Logger.error('RENDER-READING', 'Render failed', { tag: this.tag, error: (error as Error).message });
+        const errorEl = this.handleError(error as Error);
         this.targetElement.replaceWith(errorEl);
 
         // Clean up args text even on error (search next to error element in DOM)
@@ -165,7 +166,7 @@ export class ReadingModeRenderer extends TagRenderer {
     /**
      * Extract tag name and arguments from a tag element
      */
-    private static extractTagInfoFromElement(tagElement: HTMLElement): { tag: string, args: any } {
+    private static extractTagInfoFromElement(tagElement: HTMLElement): { tag: string, args: Record<string, unknown> } {
         // Get the tag name from the element
         let tagName = tagElement.textContent?.trim();
         if (!tagName) return { tag: '', args: {} };
@@ -199,7 +200,7 @@ export class ReadingModeRenderer extends TagRenderer {
     /**
      * Process script result into an HTMLElement
      */
-    protected processScriptResult(result: any): HTMLElement {
+    protected processScriptResult(result: unknown): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan();
             Logger.debug('RENDER-PIPELINE', 'Output fallback to original tag', {
@@ -211,8 +212,10 @@ export class ReadingModeRenderer extends TagRenderer {
 
         if (typeof result === 'string') {
             const stringEl = createSpan();
-            stringEl.innerHTML = result;
-            Logger.debug('RENDER-PIPELINE', 'Output rendered as HTML string', {
+            // BREAKING CHANGE: Switched from innerHTML to textContent for security
+            // Scripts returning HTML strings should return HTMLElement instead
+            stringEl.textContent = result;
+            Logger.debug('RENDER-PIPELINE', 'Output rendered as text string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -258,8 +261,8 @@ export class ReadingModeRenderer extends TagRenderer {
 
             // Process all tags in parallel - each gets its own scoped logger from factory
             const results = await Promise.all(
-                tagElements.map((tagElement, index) =>
-                    this.processTagElement(tagElement, tagMapping, rendererFactory, context, index)
+                tagElements.map((tagElement) =>
+                    this.processTagElement(tagElement, tagMapping, rendererFactory, context)
                 )
             );
 
@@ -284,8 +287,7 @@ export class ReadingModeRenderer extends TagRenderer {
         tagElement: HTMLElement,
         tagMapping: ITagMappingProvider,
         rendererFactory: RendererFactoryService,
-        context: MarkdownPostProcessorContext,
-        index: number
+        context: MarkdownPostProcessorContext
     ): Promise<boolean> {
         return await Logger.withScope('🔍 Process Tag Element', async () => {
             // Extract tag name early for matching
@@ -300,7 +302,7 @@ export class ReadingModeRenderer extends TagRenderer {
 
             if (mapping) {
                 // Extract full tag info with arguments
-                const { tag, args } = this.extractTagInfoFromElement(tagElement);
+                const { args } = this.extractTagInfoFromElement(tagElement);
 
                 Logger.debug('RENDER-READING', `Mapping found for ${tagName}`, {
                     tag: mapping.tag,
@@ -314,9 +316,7 @@ export class ReadingModeRenderer extends TagRenderer {
                     mapping,
                     context.sourcePath,
                     tagElement,
-                    args,
-                    context.docId,
-                    index
+                    args
                 );
 
                 // Render (renderer has its own scoped logger and will flush)

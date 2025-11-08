@@ -1,5 +1,11 @@
 import { App } from 'obsidian';
-import { TagScriptMapping, TagverseSettings } from '../types/interfaces';
+import { TagScriptMapping, TagverseSettings, ScriptContext } from '../types/interfaces';
+
+/**
+ * Type for a tag render function
+ * Takes a ScriptContext and returns a result (HTMLElement, string, or other value)
+ */
+export type TagRenderFunction = (context: ScriptContext) => unknown;
 
 /**
  * Interface for script loading and caching service.
@@ -12,7 +18,7 @@ export interface IScriptLoader {
      * @param app Obsidian app instance for vault access
      * @returns A function that can be executed with context
      */
-    loadScript(scriptPath: string, app: App): Promise<Function>;
+    loadScript(scriptPath: string, app: App): Promise<TagRenderFunction>;
 
     /**
      * Clear the script cache

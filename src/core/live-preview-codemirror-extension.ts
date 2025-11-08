@@ -4,7 +4,8 @@ import {
     EditorView,
     ViewPlugin,
     ViewUpdate,
-    MatchDecorator
+    MatchDecorator,
+    PluginValue
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
 import { StateField } from '@codemirror/state';
@@ -13,6 +14,16 @@ import { TagMatchingService, MatchContext } from '../services/tag-matching.servi
 import { TagMappingStateManager } from './live-preview-state';
 import { TagParser } from '../utils/tag-parser';
 import { REGEX_PATTERNS } from '../constants';
+
+/**
+ * Interface for the Tagverse ViewPlugin value
+ * Extends PluginValue to satisfy CodeMirror's type constraints
+ */
+interface TagverseViewPluginValue extends PluginValue {
+    decorations: DecorationSet;
+    update(update: ViewUpdate): void;
+    destroy?(): void;
+}
 
 /**
  * Handles CodeMirror extension setup for live preview tag rendering
@@ -26,7 +37,7 @@ export class LivePreviewCodeMirrorExtension {
     /**
      * Creates the CodeMirror extension for live preview
      */
-    createExtension(): [ViewPlugin<any>, any] {
+    createExtension(): [ViewPlugin<TagverseViewPluginValue>, StateField<number>] {
         const matchDecorator = this.createMatchDecorator();
         const app = this.app;
 
@@ -35,7 +46,7 @@ export class LivePreviewCodeMirrorExtension {
             private needsInitialUpdate = true;
             private justInitialized = false;
 
-            constructor(view: EditorView) {
+            constructor(_view: EditorView) {
                 const file = app.workspace.getActiveFile();
                 Logger.debug('VIEWPLUGIN', 'ViewPlugin created', {
                     filePath: file?.path || 'unknown'
@@ -77,7 +88,7 @@ export class LivePreviewCodeMirrorExtension {
 
                 if (Object.values(reasons).some(Boolean)) {
                     const reasonStr = Object.entries(reasons)
-                        .filter(([_, value]) => value)
+                        .filter(([, value]) => value)
                         .map(([key]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
                         .join(', ');
 
@@ -117,10 +128,6 @@ export class LivePreviewCodeMirrorExtension {
             decoration: (match: RegExpExecArray, view: EditorView, pos: number) => {
                 const fullMatch = match[0];
 
-                // Extract tag name early for logging
-                const tagNameMatch = fullMatch.match(/^#([a-zA-Z0-9_-]+)/);
-                const tagName = tagNameMatch ? tagNameMatch[1] : 'unknown';
-
                 const tagLength = fullMatch.length;
                 const cursor = view.state.selection.main.head;
                 const isLivePreview = view.state.field(editorLivePreviewField as unknown as StateField<boolean>);
@@ -142,7 +149,7 @@ export class LivePreviewCodeMirrorExtension {
 
                 let decoration = null;
                 if (this.tagMatchingService.shouldCreateWidget(context)) {
-                    decoration = this.tagMatchingService.createWidgetDecoration(tag, args, context);
+                    return this.tagMatchingService.createWidgetDecoration(tag, args);
                 }
 
                 return decoration;

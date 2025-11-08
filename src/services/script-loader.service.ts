@@ -1,13 +1,38 @@
 import { App, TFile } from 'obsidian';
 import { Logger } from '../utils/logger';
-import { IScriptLoader } from './interfaces';
+import { IScriptLoader, TagRenderFunction } from './interfaces';
 
+/**
+ * Service for loading and caching user scripts from the vault.
+ *
+ * SECURITY MODEL:
+ * This service uses the Function constructor (similar to eval) to dynamically load
+ * and execute JavaScript code from user scripts in the vault. While this is generally
+ * considered a security risk, it is acceptable in this context because:
+ *
+ * 1. **User-Controlled Content**: Scripts are files in the user's own Obsidian vault,
+ *    not external or untrusted sources. The user has full control over these files.
+ *
+ * 2. **Intentional Design**: The plugin's core functionality is to execute user-written
+ *    scripts to render custom tag content. This is the intended purpose of the plugin.
+ *
+ * 3. **Execution Context**: Scripts execute with the same privileges as the plugin itself,
+ *    which has access to the Obsidian App instance and vault. This is by design to allow
+ *    scripts to interact with the user's notes and vault.
+ *
+ * 4. **Trust Model**: The security boundary is at the vault level - if a user's vault is
+ *    compromised, the entire vault content (including notes) is already at risk. Scripts
+ *    are part of that trusted vault content.
+ *
+ * Users should be aware that:
+ * - Scripts have full access to the Obsidian API and can read/write vault files
+ * - Scripts from untrusted sources should not be added to the vault
+ * - The plugin does not sandbox or restrict script execution
+ */
 export class ScriptLoaderService implements IScriptLoader {
-    private scriptCache: Map<string, Function> = new Map();
+    private scriptCache: Map<string, TagRenderFunction> = new Map();
 
-    constructor() {}
-
-    async loadScript(scriptPath: string, app: App): Promise<Function> {
+    async loadScript(scriptPath: string, app: App): Promise<TagRenderFunction> {
         return await Logger.withScope(`📜 Load Script: ${scriptPath}`, async () => {
             if (scriptPath.startsWith('community:')) {
                 return this.loadCommunityScript(scriptPath, app);
@@ -31,7 +56,7 @@ export class ScriptLoaderService implements IScriptLoader {
         });
     }
 
-    private async checkCache(scriptPath: string): Promise<Function | null> {
+    private async checkCache(scriptPath: string): Promise<TagRenderFunction | null> {
         return await Logger.withScope('💾 Cache Check', async () => {
             if (this.scriptCache.has(scriptPath)) {
                 Logger.debug('CACHE', 'Cache hit', { scriptPath });
@@ -74,7 +99,7 @@ export class ScriptLoaderService implements IScriptLoader {
         });
     }
 
-    private async createScriptFunction(scriptContent: string, scriptPath: string): Promise<Function> {
+    private async createScriptFunction(scriptContent: string, scriptPath: string): Promise<TagRenderFunction> {
         return await Logger.withScope('⚙️ Create Function', async () => {
             try {
                 const wrappedScript = `
@@ -90,6 +115,8 @@ export class ScriptLoaderService implements IScriptLoader {
                     });
                 `;
 
+            // Use Function constructor to dynamically load user script
+            // This is intentional - see class-level security documentation
                 const func = new Function(wrappedScript)();
                 Logger.debug('SCRIPT-LOADER', 'Script function created', { scriptPath });
                 return func;
@@ -100,14 +127,14 @@ export class ScriptLoaderService implements IScriptLoader {
         });
     }
 
-    private async cacheScript(scriptPath: string, scriptFunction: Function): Promise<void> {
+    private async cacheScript(scriptPath: string, scriptFunction: TagRenderFunction): Promise<void> {
         return await Logger.withScope('💾 Cache Store', async () => {
             this.scriptCache.set(scriptPath, scriptFunction);
             Logger.debug('SCRIPT-LOADER', 'Script cached', { scriptPath });
         });
     }
 
-    private async loadCommunityScript(scriptPath: string, app: App): Promise<Function> {
+    private async loadCommunityScript(scriptPath: string, app: App): Promise<TagRenderFunction> {
         const scriptId = scriptPath.replace('community:', '');
         const cacheKey = `community:${scriptId}`;
 
@@ -129,7 +156,7 @@ export class ScriptLoaderService implements IScriptLoader {
         });
     }
 
-    private async checkCommunityCache(cacheKey: string): Promise<Function | null> {
+    private async checkCommunityCache(cacheKey: string): Promise<TagRenderFunction | null> {
         return await Logger.withScope('💾 Cache Check', async () => {
             if (this.scriptCache.has(cacheKey)) {
                 Logger.debug('SCRIPT-LOADER', 'Cache hit', { cacheKey });

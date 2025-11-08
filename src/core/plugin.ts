@@ -3,7 +3,7 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { Logger, LogCategory } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { LivePreviewRenderer } from './live-preview-renderer';
 import { ReadingModeRenderer } from './reading-mode-renderer';
 import { TagverseSettingTab } from '../settings/settings-tab';
@@ -13,11 +13,30 @@ import { TagMappingService } from '../services/tag-mapping.service';
 import { SettingsService } from '../services/settings.service';
 import { RendererFactoryService } from '../services/renderer-factory.service';
 import { CommunityScriptService } from '../services/community-script.service';
-import { TagMatchingService } from '../services/tag-matching.service';
 import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../services/interfaces';
-import { TagParser } from '../utils/tag-parser';
+
+/**
+ * Interface for accessing internal CodeMirror instance
+ * This is not part of the official Obsidian API but is needed for live preview invalidation
+ */
+interface EditorWithCodeMirror {
+    cm?: {
+        dispatch: (spec: {
+            effects?: unknown[];
+            userEvent?: string;
+        }) => void;
+    };
+}
 
 export let TagversePluginInstance: TagversePlugin | null = null;
+
+/**
+ * Sets the global plugin instance
+ * This helper function avoids ESLint's no-this-alias warning
+ */
+function setPluginInstance(instance: TagversePlugin | null): void {
+    TagversePluginInstance = instance;
+}
 
 /**
  * Main plugin class for Tagverse
@@ -46,7 +65,8 @@ export default class TagversePlugin extends Plugin {
                 version: this.manifest.version
             });
 
-            TagversePluginInstance = this;
+        // Store plugin instance globally for access from other modules
+        setPluginInstance(this);
 
             // Initialize services with nested scope
             await Logger.withScope('📦 Service Initialization', async () => {
@@ -89,7 +109,7 @@ export default class TagversePlugin extends Plugin {
             }
 
             // Setup settings change handler (after initial update check to prevent duplicate callbacks)
-            this.settingsService.onSettingsChanged((settings) => {
+            this.settingsService.onSettingsChanged(() => {
                 this.onSettingsChanged();
             });
 
@@ -156,7 +176,7 @@ export default class TagversePlugin extends Plugin {
                 // Add command to refresh current view
                 this.addCommand({
                     id: 'refresh-dynamic-tags',
-                    name: 'Refresh tagverses in current note',
+                    name: 'Refresh in current note',
                     callback: async () => {
                         await Logger.withScope('🔄 Manual Refresh', async () => {
                             Logger.debug('PLUGIN-COMMAND', 'Manual refresh command executed');
@@ -191,7 +211,7 @@ export default class TagversePlugin extends Plugin {
     }
 
     onunload() {
-        TagversePluginInstance = null;
+        setPluginInstance(null);
         this.scriptLoader.clearCache();
 
         Logger.info('PLUGIN-INIT', 'Plugin unloaded successfully');
@@ -285,7 +305,7 @@ export default class TagversePlugin extends Plugin {
                     Logger.debug('PLUGIN-EVENT', `Refreshing live preview`);
                     try {
                         // Access CodeMirror EditorView (this is implementation-specific but necessary)
-                        const cm = (view.editor as any).cm;
+                        const cm = (view.editor as EditorWithCodeMirror).cm;
                         if (cm) {
                             // Dispatch enhanced transaction with user event to force visual update
                             const transactionSpec = {
@@ -294,7 +314,7 @@ export default class TagversePlugin extends Plugin {
                             };
                             cm.dispatch(transactionSpec);
                         }
-                    } catch (error) {
+                    } catch {
                         // If not live preview or CodeMirror not accessible, ignore silently
                         Logger.warn('PLUGIN-EVENT', `Not live preview, or CodeMirror not accessible`);
                     }
@@ -313,7 +333,7 @@ export default class TagversePlugin extends Plugin {
             if (updates.size > 0) {
                 new Notice(`${updates.size} script update(s) available. Check Community Scripts tab.`);
             }
-        } catch (error) {
+        } catch {
             // Silent fail - don't bother user with update check failures
         }
     }

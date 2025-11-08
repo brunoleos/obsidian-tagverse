@@ -291,6 +291,128 @@ The following aspects are fundamental to the plugin's design and unlikely to cha
 - Scripts are cached to improve performance
 - Settings control tag mappings and behavior
 
+## Security and Breaking Changes
+
+### Security Improvements (Breaking Change)
+
+**Version 1.x introduces important security improvements** that affect how scripts return content:
+
+#### String Return Values (BREAKING CHANGE)
+
+##### Previous Behavior (Pre-1.x)
+
+```javascript
+// Scripts could return HTML strings that were rendered directly
+function render(context) {
+    return '<div class="custom"><b>Bold text</b></div>';  // HTML rendered
+}
+```
+
+##### New Behavior (1.x+)
+
+```javascript
+// HTML strings are now rendered as plain text (not parsed as HTML)
+function render(context) {
+    return '<div class="custom"><b>Bold text</b></div>';  // Displays as plain text
+}
+```
+
+##### Why This Change
+
+Using `innerHTML` to render arbitrary HTML strings poses a security risk. While the scripts are user-controlled, following Obsidian's security guidelines requires using safer DOM manipulation methods.
+
+#### Migration Guide
+
+##### Option 1: Return HTMLElement (Recommended)
+
+```javascript
+function render(context) {
+    // Create elements using DOM API
+    const container = context.element.createEl('div', { cls: 'custom' });
+    container.createEl('b', { text: 'Bold text' });
+    return container;
+}
+```
+
+##### Option 2: Use Obsidian Helper Functions
+
+```javascript
+function render(context) {
+    const container = createDiv({ cls: 'custom' });
+    container.createEl('b', { text: 'Bold text' });
+    return container;
+}
+```
+
+##### Option 3: Build Complex DOM
+
+```javascript
+function render(context) {
+    const container = context.element;
+
+    // Add multiple elements
+    const title = container.createEl('h3', { text: 'Dashboard' });
+    const list = container.createEl('ul');
+
+    ['Item 1', 'Item 2', 'Item 3'].forEach(item => {
+        list.createEl('li', { text: item });
+    });
+
+    return container;
+}
+```
+
+#### Available DOM Creation Methods
+
+##### Obsidian Helper Functions
+
+- `createDiv(attrs)` - Create a div element
+- `createSpan(attrs)` - Create a span element
+- `createEl(tag, attrs)` - Create any element
+
+##### Context Element Methods
+
+- `context.element.createEl(tag, attrs)` - Create and append child element
+- `context.element.createDiv(attrs)` - Create and append div
+- `context.element.createSpan(attrs)` - Create and append span
+
+##### Standard DOM API
+
+```javascript
+const el = document.createElement('div');
+el.className = 'custom-class';
+el.textContent = 'Safe text content';
+```
+
+#### Script Security Model
+
+Scripts execute with full plugin privileges and have access to:
+
+- Complete Obsidian API via `context.app`
+- Vault read/write operations
+- File system access (within vault)
+- All Obsidian UI components
+
+**Important Security Notes:**
+
+1. Only use scripts from trusted sources (your own vault)
+2. Scripts from untrusted sources should not be added to your vault
+3. The plugin does not sandbox or restrict script execution
+4. Scripts have the same access level as the plugin itself
+
+See [src/services/script-loader.service.ts](src/services/script-loader.service.ts) for detailed security model documentation.
+
+### Type Safety Improvements
+
+Version 1.x also includes improved TypeScript types throughout the codebase:
+
+- `any` types replaced with `Record<string, unknown>` or `unknown` where appropriate
+- Proper interfaces for internal CodeMirror access
+- Better type safety for frontmatter and arguments
+- More precise return types for script execution
+
+These changes improve code quality and maintainability without affecting runtime behavior.
+
 ## Publishing to Obsidian Community
 
 ### Release Process
@@ -327,19 +449,41 @@ Examples:
 
 #### Version Increment Process
 
-**Manual Version Increment:**
-1. Edit `manifest.json` version field
-2. Edit `package.json` version field
-3. Update `versions.json` with minimum Obsidian version for the plugin version
+**Automated Version Increment (Recommended):**
 
-**Automated Version Increment:**
+Use npm's built-in version commands to automatically update all version files and create a git commit:
+
 ```bash
-npm run version  # This handles manifest.json, package.json, and versions.json
-git add manifest.json versions.json
-git commit -m "Bump version to x.y.z"
+# For bug fixes (1.0.0 → 1.0.1):
+npm version patch
+
+# For new features (1.0.0 → 1.1.0):
+npm version minor
+
+# For breaking changes (1.0.0 → 2.0.0):
+npm version major
 ```
 
-The `version-bump.mjs` script automates the version increment and version tracking. Use it instead of manual editing to ensure consistency.
+**What happens automatically:**
+1. npm updates the version in `package.json`
+2. The `version-bump.mjs` script runs and updates `manifest.json` and `versions.json`
+3. npm stages all changes and creates a git commit with the version number
+4. npm creates a git tag for the release
+
+**After versioning:**
+```bash
+# Push commits and tags to remote:
+git push && git push --tags
+```
+
+**Manual Version Increment (Not Recommended):**
+
+If you need to manually update versions:
+1. Edit `package.json` version field
+2. Run `npm run version` to sync `manifest.json` and `versions.json`
+3. Commit the changes manually
+
+The automated approach is preferred as it ensures consistency and proper git tagging.
 
 ### Best Practices
 

@@ -1,4 +1,4 @@
-import { WidgetType, ViewPlugin } from '@codemirror/view';
+import { WidgetType, ViewPlugin, PluginValue, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
 import { Logger } from '../utils/logger';
@@ -10,8 +10,18 @@ import { TagMatchingService } from '../services/tag-matching.service';
 import { LivePreviewCodeMirrorExtension } from './live-preview-codemirror-extension';
 import { RendererFactoryService } from '../services/renderer-factory.service';
 
+/**
+ * Interface for the Tagverse ViewPlugin value
+ * Extends PluginValue to satisfy CodeMirror's type constraints
+ */
+interface TagverseViewPluginValue extends PluginValue {
+    decorations: DecorationSet;
+    update(update: ViewUpdate): void;
+    destroy?(): void;
+}
+
 declare global {
-    function createSpan(attrs?: any): HTMLSpanElement;
+    function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;
 }
 
 /**
@@ -28,8 +38,8 @@ export class LivePreviewRenderer extends TagRenderer {
         tag: string,
         mapping: TagScriptMapping,
         sourcePath: string,
-        private frontmatter: any,
-        private args: any = {}
+        private frontmatter: Record<string, unknown>,
+        private args: Record<string, unknown> = {}
     ) {
         super(scriptLoader, app, tag, mapping, sourcePath);
 
@@ -39,8 +49,18 @@ export class LivePreviewRenderer extends TagRenderer {
         // Create widget type wrapper
         this._widgetType = new TagverseWidgetType(this);
 
-        // Start async loading
-        this.render(frontmatter, args);
+        // Start async loading with error handling
+        this.render(frontmatter, args).catch((error) => {
+            Logger.error('RENDER-LIVE', 'Failed to initialize renderer', {
+                tag: this.tag,
+                error: error instanceof Error ? error.message : String(error)
+            });
+            const errorEl = this.handleError(error);
+            if (this.container) {
+                this.container.empty();
+                this.container.appendChild(errorEl);
+            }
+        });
     }
 
     getMode(): 'live-preview' {
@@ -64,7 +84,7 @@ export class LivePreviewRenderer extends TagRenderer {
     /**
      * Render the tag in live preview mode
      */
-    async render(frontmatter: any, args: any = {}): Promise<void> {
+    async render(frontmatter: Record<string, unknown>, args: Record<string, unknown> = {}): Promise<void> {
         if (this.rendered) return;
         this.rendered = true;
 
@@ -88,7 +108,7 @@ export class LivePreviewRenderer extends TagRenderer {
 
                 // Update container with rendered content
                 await Logger.withScope('🔄 Update Container', async () => {
-                    this.container!.innerHTML = '';
+                    this.container!.empty();
                     this.container!.appendChild(contentElement);
                     Logger.debug('RENDER-PIPELINE', 'Container updated with rendered content', {
                         tag: this.tag
@@ -103,7 +123,7 @@ export class LivePreviewRenderer extends TagRenderer {
                 await Logger.withScope('❌ Handle Error', async () => {
                     // Handle error
                     const errorEl = this.handleError(error as Error);
-                    this.container!.innerHTML = '';
+                    this.container!.empty();
                     this.container!.appendChild(errorEl);
 
                     // Log error
@@ -116,7 +136,7 @@ export class LivePreviewRenderer extends TagRenderer {
     /**
      * Process script result into an HTMLElement
      */
-    protected processScriptResult(result: any): HTMLElement {
+    protected processScriptResult(result: unknown): HTMLElement {
         if (result === null || result === undefined) {
             const fallback = createSpan({ text: `#${this.tag}` });
             Logger.debug('RENDER-PIPELINE', 'Output fallback to plain tag', {
@@ -128,8 +148,10 @@ export class LivePreviewRenderer extends TagRenderer {
 
         if (typeof result === 'string') {
             const stringEl = createSpan();
-            stringEl.innerHTML = result;
-            Logger.debug('RENDER-PIPELINE', 'Output rendered as HTML string', {
+            // BREAKING CHANGE: Switched from innerHTML to textContent for security
+            // Scripts returning HTML strings should return HTMLElement instead
+            stringEl.textContent = result;
+            Logger.debug('RENDER-PIPELINE', 'Output rendered as text string', {
                 tag: this.tag,
                 length: result.length
             });
@@ -163,8 +185,8 @@ export class LivePreviewRenderer extends TagRenderer {
     static registerLivePreviewExtension(
         app: App,
         tagMapping: ITagMappingProvider,
-        rendererFactory: RendererFactoryService,
-    ): [ViewPlugin<any>, StateField<number>] {
+        rendererFactory: RendererFactoryService
+    ): [ViewPlugin<TagverseViewPluginValue>, StateField<number>] {
         const tagMatchingService = new TagMatchingService(tagMapping, rendererFactory, app);
         const extension = new LivePreviewCodeMirrorExtension(tagMatchingService, app);
         return extension.createExtension();

@@ -1,7 +1,7 @@
 import { Plugin } from 'obsidian';
-import { logger } from '../utils/logger';
-import { TagverseSettings, DEFAULT_SETTINGS } from '../types/interfaces';
-import { ISettingsService } from './interfaces';
+import { logger } from '../../2-foundation/logging/logger';
+import { TagverseSettings, DEFAULT_SETTINGS } from '../../1-domain/types/interfaces';
+import { ISettingsService } from '../interfaces';
 
 /**
  * Service responsible for managing plugin settings.

@@ -1,9 +1,9 @@
 import { App } from 'obsidian';
-import { TagScriptMapping } from '../types/interfaces';
-import { IScriptLoader } from './interfaces';
-import { LivePreviewRenderer } from '../core/live-preview-renderer';
-import { ReadingModeRenderer } from '../core/reading-mode-renderer';
-import { TagArguments } from '../utils/tag-parser';
+import { TagScriptMapping } from '../../1-domain/types/interfaces';
+import { IScriptLoader } from '../../3-services/interfaces';
+import { LivePreviewRenderer } from '../live-preview/live-preview-renderer';
+import { ReadingModeRenderer } from '../reading-mode/reading-mode-renderer';
+import { TagArguments } from '../../2-foundation/parsing/tag-parser';
 
 /**
  * Factory service for creating renderer instances.

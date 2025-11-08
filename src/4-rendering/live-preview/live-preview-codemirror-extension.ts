@@ -9,11 +9,11 @@ import {
 } from '@codemirror/view';
 import { App, editorLivePreviewField } from 'obsidian';
 import { StateField } from '@codemirror/state';
-import { TagMatchingService, MatchContext } from '../services/tag-matching.service';
+import { TagMatchingService, MatchContext } from '../tag-matching.service';
 import { TagMappingStateManager } from './live-preview-state';
-import { logger } from '../utils/logger';
-import { TagParser } from '../utils/tag-parser';
-import { REGEX_PATTERNS } from '../constants';
+import { logger } from '../../2-foundation/logging/logger';
+import { TagParser } from '../../2-foundation/parsing/tag-parser';
+import { REGEX_PATTERNS } from '../../1-domain/constants';
 
 /**
  * Interface for the Tagverse ViewPlugin value

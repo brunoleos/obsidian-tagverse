@@ -1,9 +1,9 @@
 import { Decoration } from '@codemirror/view';
 import { App } from 'obsidian';
-import { ITagMappingProvider } from './interfaces';
-import { RendererFactoryService } from './renderer-factory.service';
-import { logger } from '../utils/logger';
-import { TagArguments } from '../utils/tag-parser';
+import { ITagMappingProvider } from '../3-services/interfaces';
+import { RendererFactoryService } from './factory/renderer-factory.service';
+import { logger } from '../2-foundation/logging/logger';
+import { TagArguments } from '../2-foundation/parsing/tag-parser';
 
 export interface MatchContext {
     tag: string;

@@ -3,16 +3,16 @@ import {
     MarkdownView,
     Notice
 } from 'obsidian';
-import { logger } from '../utils/logger';
-import { LivePreviewRenderer } from './live-preview-renderer';
-import { ReadingModeRenderer } from './reading-mode-renderer';
-import { TagverseSettingTab } from '../settings/settings-tab';
-import { TagverseSettings } from '../types/interfaces';
-import { ScriptLoaderService } from '../services/script-loader.service';
-import { TagMappingService } from '../services/tag-mapping.service';
-import { SettingsService } from '../services/settings.service';
-import { RendererFactoryService } from '../services/renderer-factory.service';
-import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../services/interfaces';
+import { logger } from '../2-foundation/logging/logger';
+import { LivePreviewRenderer } from '../4-rendering/live-preview/live-preview-renderer';
+import { ReadingModeRenderer } from '../4-rendering/reading-mode/reading-mode-renderer';
+import { TagverseSettingTab } from '../6-ui/settings/settings-tab';
+import { TagverseSettings } from '../1-domain/types/interfaces';
+import { ScriptLoaderService } from '../3-services/script-loader/script-loader.service';
+import { TagMappingService } from '../3-services/tag-mapping/tag-mapping.service';
+import { SettingsService } from '../3-services/settings/settings.service';
+import { RendererFactoryService } from '../4-rendering/factory/renderer-factory.service';
+import { IScriptLoader, ITagMappingProvider, ISettingsService } from '../3-services/interfaces';
 
 /**
  * Interface for accessing internal CodeMirror instance

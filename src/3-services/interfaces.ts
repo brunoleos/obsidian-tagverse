@@ -1,5 +1,5 @@
 import { App } from 'obsidian';
-import { TagScriptMapping, TagverseSettings, ScriptContext } from '../types/interfaces';
+import { TagScriptMapping, TagverseSettings, ScriptContext } from '../1-domain/types/interfaces';
 
 /**
  * Type for a tag render function

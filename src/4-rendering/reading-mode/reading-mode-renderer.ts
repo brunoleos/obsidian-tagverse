@@ -1,11 +1,11 @@
 import { App, MarkdownPostProcessorContext } from 'obsidian';
-import { TagRenderer } from './renderer';
-import { TagScriptMapping } from '../types/interfaces';
-import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
-import { RendererFactoryService } from '../services/renderer-factory.service';
-import { logger } from '../utils/logger';
-import { TagParser } from '../utils/tag-parser';
-import { REGEX_PATTERNS } from '../constants';
+import { TagRenderer } from '../base/renderer';
+import { TagScriptMapping } from '../../1-domain/types/interfaces';
+import { IScriptLoader, ITagMappingProvider } from '../../3-services/interfaces';
+import { RendererFactoryService } from '../factory/renderer-factory.service';
+import { logger } from '../../2-foundation/logging/logger';
+import { TagParser } from '../../2-foundation/parsing/tag-parser';
+import { REGEX_PATTERNS } from '../../1-domain/constants';
 
 declare global {
     function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;

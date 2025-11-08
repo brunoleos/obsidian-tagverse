@@ -1,5 +1,5 @@
-import { logger } from './logger';
-import { REGEX_PATTERNS } from '../constants';
+import { logger } from '../logging/logger';
+import { REGEX_PATTERNS } from '../../1-domain/constants';
 
 /**
  * Type representing tag arguments - can be any JSON-serializable value

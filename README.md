@@ -400,22 +400,34 @@ What differentiates Tagverse is its ability to transform ANY tag into ANY intera
 
 ### Project Structure
 
-The plugin uses a modular TypeScript architecture:
+The plugin uses a **6-layer modular TypeScript architecture** with strict dependency flow:
 
 ```
 src/
-├── types/interfaces.ts      # TypeScript interfaces and types
-├── core/
-│   ├── plugin.ts           # Main plugin class (TagversePlugin)
-│   └── widget.ts           # Widget class (TagverseWidget)
-├── settings/
-│   └── settings-tab.ts     # Settings UI (TagverseSettingTab)
-├── utils/
-│   └── logger.ts           # Logger utility
-├── constants/
-│   └── index.ts            # Constants and configuration
-└── index.ts                # Main exports
+├── 1-domain/                # Layer 1: Pure domain models
+│   ├── types/interfaces.ts      # TypeScript interfaces and types
+│   └── constants/index.ts       # Constants and configuration
+├── 2-foundation/            # Layer 2: Foundation utilities
+│   ├── logging/logger.ts        # Logger utility
+│   └── parsing/tag-parser.ts    # Tag parsing logic
+├── 3-services/              # Layer 3: Business services
+│   ├── interfaces.ts            # Service contracts
+│   ├── script-loader/           # Script loading service
+│   ├── tag-mapping/             # Tag mapping service
+│   └── settings/                # Settings service
+├── 4-rendering/             # Layer 4: Rendering logic
+│   ├── base/renderer.ts         # Base renderer class
+│   ├── live-preview/            # Live preview rendering
+│   ├── reading-mode/            # Reading mode rendering
+│   └── factory/                 # Renderer factory
+├── 5-plugin/                # Layer 5: Plugin orchestration
+│   └── plugin.ts                # Main plugin class
+├── 6-ui/                    # Layer 6: User interface
+│   └── settings/settings-tab.ts # Settings UI
+└── index.ts                     # Main exports
 ```
+
+Each layer can only import from the same or lower numbered layers, ensuring clean separation of concerns and preventing circular dependencies.
 
 ### Setup
 ```bash

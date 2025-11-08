@@ -1,14 +1,14 @@
 import { WidgetType, ViewPlugin, PluginValue, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { App } from 'obsidian';
 import { StateEffect, StateField } from '@codemirror/state';
-import { logger } from '../utils/logger';
-import { TagScriptMapping } from '../types/interfaces';
-import { IScriptLoader, ITagMappingProvider } from '../services/interfaces';
-import { TagRenderer } from './renderer';
+import { logger } from '../../2-foundation/logging/logger';
+import { TagScriptMapping } from '../../1-domain/types/interfaces';
+import { IScriptLoader, ITagMappingProvider } from '../../3-services/interfaces';
+import { TagRenderer } from '../base/renderer';
 import { TagMappingStateManager } from './live-preview-state';
-import { TagMatchingService } from '../services/tag-matching.service';
+import { TagMatchingService } from '../tag-matching.service';
 import { LivePreviewCodeMirrorExtension } from './live-preview-codemirror-extension';
-import { RendererFactoryService } from '../services/renderer-factory.service';
+import { RendererFactoryService } from '../factory/renderer-factory.service';
 
 /**
  * Interface for the Tagverse ViewPlugin value

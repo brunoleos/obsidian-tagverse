@@ -1,6 +1,6 @@
 import { App, TFile } from 'obsidian';
-import { logger } from '../utils/logger';
-import { IScriptLoader, TagRenderFunction } from './interfaces';
+import { logger } from '../../2-foundation/logging/logger';
+import { IScriptLoader, TagRenderFunction } from '../interfaces';
 
 /**
  * Service for loading and caching user scripts from the vault.

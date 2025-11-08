@@ -11,14 +11,21 @@ Core principles:
 
 ## Architecture
 
-The plugin consists of several layers:
+The plugin follows a **6-layer architecture** with strict dependency flow from outer to inner layers:
 
-- **Plugin Layer**: Main entry point (`TagversePlugin`) orchestrates all components
-- **Service Layer**: Provides shared functionality (script loading, settings, tag mapping)
-- **Rendering Layer**: Mode-specific renderers handle tag transformation
-- **Types**: Interfaces and data structures
+1. **Layer 6 - UI**: User interface components (settings tab)
+2. **Layer 5 - Plugin**: Main plugin orchestration and Obsidian integration
+3. **Layer 4 - Rendering**: Mode-specific rendering logic (live preview, reading mode)
+4. **Layer 3 - Services**: Business services (script loading, settings, tag mapping)
+5. **Layer 2 - Foundation**: Core utilities (logging, parsing)
+6. **Layer 1 - Domain**: Pure domain models (types, constants, interfaces)
 
-All components communicate through well-defined interfaces to maintain loose coupling.
+**Dependency Rules:**
+- Each layer can only import from the same layer or lower numbered layers
+- No upward dependencies allowed (e.g., services cannot import from rendering)
+- This ensures clean separation of concerns and prevents circular dependencies
+
+All components communicate through well-defined interfaces to maintain loose coupling and follow SOLID principles.
 
 ### Rendering Pipeline Comparison
 
@@ -150,29 +157,57 @@ Separating these concerns maintains clean architecture and makes each mode's log
 
 ```
 obsidian-tagverse/
-├── src/                    # Source code
-│   ├── core/              # Core plugin logic
-│   │   ├── plugin.ts           # Main plugin class
-│   │   ├── renderer.ts         # Abstract base renderer
-│   │   ├── live-preview-renderer.ts
-│   │   └── reading-mode-renderer.ts
-│   ├── services/           # Service implementations
-│   │   ├── interfaces.ts        # Service contracts
-│   │   ├── script-loader.service.ts
-│   │   ├── settings.service.ts
-│   │   ├── tag-mapping.service.ts
-│   │   └── renderer-factory.service.ts
-│   ├── settings/           # Settings UI
-│   │   └── settings-tab.ts
-│   ├── types/             # TypeScript interfaces
-│   │   └── interfaces.ts
-│   └── utils/             # Utilities
-│       └── logger.ts
-├── examples/              # Example render scripts
-├── main.ts               # Entry point
-├── manifest.json         # Plugin metadata
-├── styles.css            # Plugin styles
-└── package.json          # Dependencies and scripts
+├── src/                           # Source code (6-layer architecture)
+│   ├── 1-domain/                  # Layer 1: Pure domain (no dependencies)
+│   │   ├── types/
+│   │   │   └── interfaces.ts      # Core interfaces and types
+│   │   └── constants/
+│   │       └── index.ts           # Constants and regex patterns
+│   │
+│   ├── 2-foundation/              # Layer 2: Foundation utilities
+│   │   ├── logging/
+│   │   │   └── logger.ts          # Logging utility
+│   │   └── parsing/
+│   │       └── tag-parser.ts      # Tag parsing logic
+│   │
+│   ├── 3-services/                # Layer 3: Business services
+│   │   ├── interfaces.ts          # Service contracts
+│   │   ├── script-loader/
+│   │   │   └── script-loader.service.ts
+│   │   ├── tag-mapping/
+│   │   │   └── tag-mapping.service.ts
+│   │   ├── tag-matching/
+│   │   │   └── tag-matching.service.ts
+│   │   └── settings/
+│   │       └── settings.service.ts
+│   │
+│   ├── 4-rendering/               # Layer 4: Rendering logic
+│   │   ├── base/
+│   │   │   └── renderer.ts        # Abstract base renderer
+│   │   ├── live-preview/
+│   │   │   ├── live-preview-renderer.ts
+│   │   │   ├── live-preview-state.ts
+│   │   │   └── live-preview-codemirror-extension.ts
+│   │   ├── reading-mode/
+│   │   │   └── reading-mode-renderer.ts
+│   │   ├── factory/
+│   │   │   └── renderer-factory.service.ts
+│   │   └── tag-matching.service.ts
+│   │
+│   ├── 5-plugin/                  # Layer 5: Plugin orchestration
+│   │   └── plugin.ts              # Main plugin class
+│   │
+│   ├── 6-ui/                      # Layer 6: User interface
+│   │   └── settings/
+│   │       └── settings-tab.ts    # Settings UI
+│   │
+│   └── index.ts                   # Public API exports
+│
+├── examples/                      # Example render scripts
+├── main.ts                        # Entry point
+├── manifest.json                  # Plugin metadata
+├── styles.css                     # Plugin styles
+└── package.json                   # Dependencies and scripts
 ```
 
 ## Key Files Explained
@@ -183,9 +218,10 @@ obsidian-tagverse/
 - **package.json**: Node.js dependencies (primarily Obsidian API types)
 
 ### Architecture Files
-- **src/core/plugin.ts**: Coordinates services and Obsidian integration
-- **src/core/renderer.ts**: Base class handling script execution and result processing
-- **src/services/interfaces.ts**: Defines service contracts that maintain compatibility
+- **src/5-plugin/plugin.ts**: Coordinates services and Obsidian integration
+- **src/4-rendering/base/renderer.ts**: Base class handling script execution and result processing
+- **src/3-services/interfaces.ts**: Defines service contracts that maintain compatibility
+- **src/1-domain/types/interfaces.ts**: Core domain types and data structures
 
 ### Services
 The service layer provides the plugin's core functionality:
@@ -254,18 +290,28 @@ The build generates three core files required for Obsidian plugin installation.
 
 ### Development Focus Areas
 Core development focuses on:
-1. Adding new services in `src/services/`
-2. Implementing new renderers in `src/core/`
-3. Updating interfaces in `src/types/`
-4. Testing changes in Obsidian
+1. Adding new services in `src/3-services/`
+2. Implementing new renderers in `src/4-rendering/`
+3. Updating domain types in `src/1-domain/types/`
+4. Adding utilities in `src/2-foundation/`
+5. Testing changes in Obsidian
+
+**Layer Guidelines:**
+- Layer 1 (domain): Add new types, constants, core data structures
+- Layer 2 (foundation): Add utilities that have minimal dependencies
+- Layer 3 (services): Add business logic and application services
+- Layer 4 (rendering): Add rendering logic and UI components
+- Layer 5 (plugin): Modify plugin orchestration and Obsidian integration
+- Layer 6 (ui): Add or modify user interface components
 
 ## Adding New Features
 
 ### Service Creation
-1. Define interface in `src/services/interfaces.ts`
-2. Implement service in dedicated file
-3. Register in `TagversePlugin.initializeServices()`
-4. Inject into renderers via constructor
+1. Define interface in `src/3-services/interfaces.ts`
+2. Create service directory in `src/3-services/your-service/`
+3. Implement service class following SOLID principles
+4. Register in `TagversePlugin.initializeServices()` (src/5-plugin/plugin.ts)
+5. Inject into dependent components via constructor (Dependency Injection)
 
 ### Renderer Creation
 1. Extend `TagRenderer` base class
@@ -400,7 +446,7 @@ Scripts execute with full plugin privileges and have access to:
 3. The plugin does not sandbox or restrict script execution
 4. Scripts have the same access level as the plugin itself
 
-See [src/services/script-loader.service.ts](src/services/script-loader.service.ts) for detailed security model documentation.
+See [src/3-services/script-loader/script-loader.service.ts](src/3-services/script-loader/script-loader.service.ts) for detailed security model documentation.
 
 ### Type Safety Improvements
 

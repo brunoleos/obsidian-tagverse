@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, TFile, setIcon } from 'obsidian';
-import TagversePlugin from '../core/plugin';
-import { TagScriptMapping } from '../types/interfaces';
+import TagversePlugin from '../../5-plugin/plugin';
+import { TagScriptMapping } from '../../1-domain/types/interfaces';
 
 export class TagverseSettingTab extends PluginSettingTab {
     plugin: TagversePlugin;

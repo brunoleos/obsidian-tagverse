@@ -1,6 +1,6 @@
-import { logger } from '../utils/logger';
-import { TagScriptMapping } from '../types/interfaces';
-import { ITagMappingProvider } from './interfaces';
+import { logger } from '../../2-foundation/logging/logger';
+import { TagScriptMapping } from '../../1-domain/types/interfaces';
+import { ITagMappingProvider } from '../interfaces';
 
 /**
  * Service responsible for managing tag-to-script mappings.

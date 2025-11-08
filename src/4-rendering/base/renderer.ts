@@ -1,7 +1,7 @@
 import { Notice, App } from 'obsidian';
-import { logger } from '../utils/logger';
-import { TagScriptMapping, ScriptContext } from '../types/interfaces';
-import { IScriptLoader, TagRenderFunction } from '../services/interfaces';
+import { logger } from '../../2-foundation/logging/logger';
+import { TagScriptMapping, ScriptContext } from '../../1-domain/types/interfaces';
+import { IScriptLoader, TagRenderFunction } from '../../3-services/interfaces';
 
 declare global {
     function createSpan(attrs?: Record<string, unknown>): HTMLSpanElement;

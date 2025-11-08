@@ -1,6 +1,6 @@
 {
     "name": "obsidian-tagverse",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Transform tags into interactive universes of JavaScript-powered content",
     "main": "main.js",
     "scripts": {

@@ -1,7 +1,7 @@
 {
 	"id": "tagverse",
 	"name": "Tagverse",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"minAppVersion": "0.15.0",
 	"description": "Transform tags into interactive universes. Each #tag becomes a portal to rich JavaScript-powered content - buttons, charts, forms, and infinite possibilities.",
 	"author": "brunoleos",

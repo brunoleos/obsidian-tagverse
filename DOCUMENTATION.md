@@ -2,9 +2,10 @@
 
 ## Table of Contents
 1. [Script Development Guide](#script-development-guide)
-2. [Simple Examples](#simple-examples)
-3. [API Reference](#api-reference)
-4. [Troubleshooting](#troubleshooting)
+2. [Security Considerations](#security-considerations)
+3. [Simple Examples](#simple-examples)
+4. [API Reference](#api-reference)
+5. [Troubleshooting](#troubleshooting)
 
 ## Script Development Guide
 
@@ -112,6 +113,183 @@ You can return:
    ```javascript
    if (someCondition) return null;
    ```
+
+## Security Considerations
+
+### Understanding Script Execution
+
+Tagverse executes JavaScript code from your vault to provide dynamic tag rendering. As a script developer, you should understand what your scripts can do and how to write them safely.
+
+### Script Capabilities
+
+Your scripts have full access to:
+
+**Vault Operations:**
+- Read any file: `context.app.vault.read(file)`
+- Write to files: `context.app.vault.modify(file, content)`
+- Create new files: `context.app.vault.create(path, content)`
+- Delete files: `context.app.vault.delete(file)`
+- List all files: `context.app.vault.getMarkdownFiles()`
+
+**Metadata Access:**
+- File metadata: `context.app.metadataCache.getFileCache(file)`
+- Frontmatter: `context.frontmatter` (current note)
+- Links and backlinks
+- Tags and headings
+
+**Workspace Control:**
+- Open notes: `context.app.workspace.openLinkText(link, sourcePath)`
+- Access active file: `context.app.workspace.getActiveFile()`
+- Manipulate UI elements
+- Show notifications: `new context.Notice(message)`
+
+**Full JavaScript Runtime:**
+- DOM manipulation
+- Network requests (fetch, XMLHttpRequest)
+- Timers (setTimeout, setInterval)
+- Local storage
+- All standard JavaScript APIs
+
+### Writing Secure Scripts
+
+**Best Practices:**
+
+1. **Validate Input**
+   ```javascript
+   function render(context) {
+       // Validate tag arguments
+       const value = typeof context.args.value === 'number'
+           ? context.args.value
+           : 0;
+
+       // Sanitize user input
+       const label = String(context.args.label || '').slice(0, 100);
+   }
+   ```
+
+2. **Handle Errors Gracefully**
+   ```javascript
+   async function render(context) {
+       try {
+           const file = context.app.vault.getAbstractFileByPath(somePath);
+           if (!file) {
+               return '<span class="error">File not found</span>';
+           }
+           const content = await context.app.vault.read(file);
+           return processContent(content);
+       } catch (error) {
+           console.error('Render error:', error);
+           return `<span class="error">Error: ${error.message}</span>`;
+       }
+   }
+   ```
+
+3. **Avoid Unnecessary File Operations**
+   ```javascript
+   // Bad: Reading all files every render
+   async function render(context) {
+       const files = context.app.vault.getMarkdownFiles();
+       // Processing all files...
+   }
+
+   // Good: Cache results or limit scope
+   async function render(context) {
+       // Only process files in specific folder
+       const files = context.app.vault.getMarkdownFiles()
+           .filter(f => f.path.startsWith('specific-folder/'));
+   }
+   ```
+
+4. **Use Safe DOM Manipulation**
+   ```javascript
+   // Good: Using textContent for user data
+   element.textContent = userProvidedText;
+
+   // Careful: innerHTML with user data (XSS risk if sharing scripts)
+   element.innerHTML = sanitizedHTML; // Only if you control the content
+   ```
+
+5. **Document Your Scripts**
+   ```javascript
+   /**
+    * Progress Bar Renderer
+    *
+    * Arguments:
+    * - value: Current progress (0-100)
+    * - label: Optional label text
+    *
+    * Example: #progress{value: 75, label: "Complete"}
+    */
+   function render(context) {
+       // Implementation...
+   }
+   ```
+
+### Security Model
+
+**Trust Boundary:**
+The vault is the security boundary. Scripts in your vault are treated as trusted content, just like your notes.
+
+**What This Means:**
+- Scripts from your vault are trusted and executed with full permissions
+- The plugin does not sandbox or restrict script execution
+- Scripts have the same capabilities as the plugin itself
+- You are responsible for the scripts you add to your vault
+
+**For Script Sharing:**
+When sharing scripts with others:
+- Document what the script does clearly
+- Use descriptive variable and function names
+- Include comments explaining complex logic
+- Warn about any file modifications
+- Provide example usage
+
+**For Script Users:**
+When using scripts from others:
+- Review the code before adding to your vault
+- Understand what the script does
+- Test on non-critical data first
+- Keep backups of your vault
+
+### Common Pitfalls to Avoid
+
+1. **Infinite Loops in Renders**
+   ```javascript
+   // Bad: Can freeze Obsidian
+   function render(context) {
+       while(true) { /* ... */ }
+   }
+   ```
+
+2. **Memory Leaks**
+   ```javascript
+   // Bad: Event listeners not cleaned up
+   setInterval(() => updateElement(), 1000); // Runs forever
+
+   // Good: Store reference and clean up if needed
+   // (Though for tag rendering, this is generally managed by Obsidian)
+   ```
+
+3. **Slow Synchronous Operations**
+   ```javascript
+   // Bad: Blocking operation
+   function render(context) {
+       // Complex computation that takes seconds
+       const result = complexCalculation();
+   }
+
+   // Good: Use async or web workers for heavy computation
+   async function render(context) {
+       const result = await calculateAsync();
+   }
+   ```
+
+### Additional Resources
+
+For comprehensive security documentation including technical implementation details and threat model analysis, see:
+- [SECURITY.md](SECURITY.md) - Full security documentation
+- [README.md - Security Section](README.md#-security-considerations) - User-facing overview
+- [PLUGIN_DEVELOPMENT.md](PLUGIN_DEVELOPMENT.md) - Technical architecture
 
 ## Simple Examples
 

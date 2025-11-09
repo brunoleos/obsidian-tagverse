@@ -378,6 +378,65 @@ Tagverse makes tag-based interactivity general-purpose. Here are related plugins
 
 What differentiates Tagverse is its ability to transform ANY tag into ANY interactive content using JavaScript, giving creators full control over user experiences.
 
+## 🔒 Security Considerations
+
+Tagverse executes custom JavaScript code from your vault to render dynamic tag content. Understanding the security model is important for safe usage.
+
+### What You Need to Know
+
+**Scripts Have Full Access:**
+- ✅ Can read and write any vault file
+- ✅ Can access note metadata and frontmatter
+- ✅ Can interact with the Obsidian API
+- ✅ Have the same permissions as the plugin itself
+
+**Your Responsibilities:**
+- ⚠️ Only use scripts you trust
+- ⚠️ Review script code before adding to your vault
+- ⚠️ Be cautious with scripts from external sources
+- ⚠️ Keep vault backups (recommended for all Obsidian usage)
+
+### Security Model
+
+The **vault is the security boundary** - Tagverse treats script files the same way Obsidian treats your notes: as trusted content under your control.
+
+If someone gains write access to your vault, they could:
+- Modify your notes and documents
+- Change plugin settings
+- Add or modify scripts
+
+This is why protecting your vault with system-level security (file permissions, encryption, access control) is important.
+
+### Why This Approach?
+
+Tagverse's purpose is to give you full programmatic control over tag rendering. This requires:
+- Async access to vault files
+- Full Obsidian API capabilities
+- Context injection for tag data
+- DOM manipulation for rendering
+
+Alternative "safer" approaches (sandboxing, Workers, iframe isolation) would prevent these core capabilities and defeat the plugin's purpose.
+
+This design is consistent with other Obsidian plugins like **Templater**, **Custom JS**, and **Dataview** that execute user code for extensibility.
+
+### Best Practices
+
+✅ **DO:**
+- Review scripts before adding them
+- Use scripts from trusted sources
+- Keep vault backups
+- Test scripts on non-critical data first
+- Share script code openly for community review
+
+❌ **DON'T:**
+- Copy untrusted scripts without review
+- Give vault access to untrusted users
+- Disable sync/backup while experimenting
+
+### More Information
+
+For comprehensive security documentation, technical justification, and threat model analysis, see [SECURITY.md](SECURITY.md).
+
 ## 🚀 Future Roadmap
 
 ### High Priority
@@ -453,7 +512,3 @@ MIT License - see LICENSE file for details
 ## Credits
 
 Created with ❤️ for the Obsidian community
-
----
-
-**Note**: This plugin executes custom JavaScript code. Only use scripts from trusted sources and review them before use.

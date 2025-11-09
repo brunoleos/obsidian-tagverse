@@ -400,7 +400,189 @@ Scripts execute with full plugin privileges and have access to:
 3. The plugin does not sandbox or restrict script execution
 4. Scripts have the same access level as the plugin itself
 
-See [src/services/script-loader.service.ts](src/services/script-loader.service.ts) for detailed security model documentation.
+See [src/services/script-loader.service.ts](src/services/script-loader.service.ts) for detailed security model documentation in the code, and [SECURITY.md](SECURITY.md) for comprehensive security documentation.
+
+#### Technical Implementation: Function Constructor
+
+##### Why We Use `new Function()`
+
+The script loader ([src/services/script-loader.service.ts](src/services/script-loader.service.ts)) uses JavaScript's `Function` constructor to dynamically load and execute user scripts. This approach is flagged by linters as a security risk (similar to `eval()`), but is the correct technical choice for this plugin.
+
+##### Architectural Requirements
+
+User scripts require the following capabilities that cannot be achieved through alternative approaches:
+
+**1. Async/Await Support**
+```typescript
+// Scripts must be able to await vault operations
+async function render(context) {
+    const file = context.app.vault.getAbstractFileByPath('data.md');
+    const content = await context.app.vault.read(file);  // Must await
+    return processContent(content);
+}
+```
+
+**2. Context Injection**
+```typescript
+// Must inject context object with app, tag, args, etc.
+const wrappedScript = `
+    return (async function(context) {
+        const Notice = context.Notice;
+        ${scriptContent}
+        if (typeof render === 'function') {
+            return await render(context);
+        }
+        throw new Error('No render() function found');
+    });
+`;
+```
+
+**3. Module-Level Variables**
+```typescript
+// Scripts can define helpers outside render() function
+const helper = (x) => x * 2;
+
+function render(context) {
+    return helper(context.args.value);  // Uses closure
+}
+```
+
+**4. Full API Access**
+Scripts need unrestricted access to:
+- Vault operations (`app.vault.read()`, `app.vault.modify()`)
+- Metadata cache (`app.metadataCache.getFileCache()`)
+- Workspace control (`app.workspace.openLinkText()`)
+- DOM manipulation (create elements, event listeners)
+- Plugin access (`app.plugins.getPlugin()`)
+
+##### Alternatives Evaluated
+
+Extensive research was conducted to find safer alternatives. All were rejected for specific technical reasons:
+
+**1. Dynamic `import()` with Blob URLs**
+```typescript
+// Would require:
+const blob = new Blob([scriptContent], { type: 'application/javascript' });
+const url = URL.createObjectURL(blob);
+const module = await import(url);
+```
+
+**Rejected because:**
+- ❌ Blocked by Electron's security policies for blob/data URLs
+- ❌ Cannot inject context variables into ES6 module scope
+- ❌ Would require rewriting all user scripts to use `export` syntax
+- ❌ Breaking change for all existing scripts
+- ❌ No security benefit (still executing user code)
+
+**2. Web Workers**
+```typescript
+const worker = new Worker('script.js');
+worker.postMessage(context);
+```
+
+**Rejected because:**
+- ❌ Workers cannot access DOM (no UI rendering)
+- ❌ Different global scope (no Obsidian API access)
+- ❌ Complex message passing required
+- ❌ Fundamental architectural mismatch
+
+**3. iframe Sandboxing**
+```typescript
+const iframe = document.createElement('iframe');
+iframe.sandbox = 'allow-scripts';
+```
+
+**Rejected because:**
+- ❌ Sandboxed iframes cannot access parent window
+- ❌ No access to Obsidian App instance
+- ❌ Defeats the plugin's purpose
+- ❌ Massive complexity for no benefit
+
+**4. VM/Sandboxed Execution**
+```typescript
+const vm = require('vm');
+vm.runInNewContext(scriptContent, sandbox);
+```
+
+**Rejected because:**
+- ❌ Would need to whitelist every Obsidian API method
+- ❌ Users want full vault access (core feature)
+- ❌ Defeats plugin's value proposition
+- ❌ No security benefit given the trust model
+
+##### Why Function Constructor is Correct
+
+Given the architectural requirements and failed alternatives:
+
+✅ **Enables Required Functionality**
+- Native async/await support
+- Context injection capability
+- Full API access
+- Compatible with existing patterns
+
+✅ **Matches Security Model**
+- Vault is the trust boundary
+- Scripts are trusted vault content
+- Sandboxing provides no benefit
+
+✅ **Proven Pattern**
+- Consistent with Templater plugin
+- Consistent with Custom JS plugin
+- Consistent with Dataview plugin (for user code)
+- Well-understood behavior
+
+✅ **Performance**
+- Simple implementation
+- No unnecessary overhead
+- Efficient caching
+
+##### Implementation Details
+
+**Script Wrapping:**
+```typescript
+const wrappedScript = `
+    return (async function(context) {
+        const Notice = context.Notice;
+        ${scriptContent}
+
+        if (typeof render === 'function') {
+            return await render(context);
+        }
+
+        throw new Error('No render() function found in script');
+    });
+`;
+
+// eslint-disable-next-line no-new-func
+const scriptFunction = new Function(wrappedScript)();
+```
+
+**Key Aspects:**
+1. Wraps user script in async function
+2. Accepts `context` parameter
+3. Exposes `Notice` directly for convenience
+4. Validates `render()` function exists
+5. Returns promise for async execution
+
+**Error Handling:**
+- Script syntax errors caught during Function creation
+- Runtime errors caught during execution
+- User-friendly error messages displayed
+- Errors logged for debugging
+
+**Caching:**
+- Compiled functions cached by script path
+- Avoids recompilation on every render
+- Cache cleared when scripts modified
+- Significant performance improvement
+
+##### Security Documentation References
+
+For comprehensive security information:
+- **Code Implementation**: [src/services/script-loader.service.ts](src/services/script-loader.service.ts) (lines 5-57)
+- **Comprehensive Analysis**: [SECURITY.md](SECURITY.md)
+- **User Documentation**: [README.md - Security Section](README.md#-security-considerations)
+- **Developer Guide**: [DOCUMENTATION.md - Security](DOCUMENTATION.md#security-considerations)
 
 ### Type Safety Improvements
 

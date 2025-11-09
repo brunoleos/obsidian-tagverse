@@ -24,6 +24,32 @@ import { IScriptLoader, TagRenderFunction } from './interfaces';
  *    compromised, the entire vault content (including notes) is already at risk. Scripts
  *    are part of that trusted vault content.
  *
+ * WHY FUNCTION CONSTRUCTOR IS NECESSARY:
+ * Alternative approaches were evaluated and rejected for the following technical reasons:
+ *
+ * - **Dynamic import()**: Requires ES6 module syntax, blocked by Electron security policies
+ *   for blob/data URLs, and cannot inject context variables into module scope.
+ *
+ * - **AsyncFunction constructor**: Same security profile as Function(), but would break
+ *   all existing user scripts by requiring different syntax patterns.
+ *
+ * - **Web Workers**: Cannot access DOM or Obsidian API, runs in isolated thread,
+ *   incompatible with synchronous UI rendering requirements.
+ *
+ * - **iframe sandboxing**: Prevents access to Obsidian API and vault operations,
+ *   defeats the core purpose of the plugin.
+ *
+ * - **VM/sandboxed execution**: Would require whitelisting every Obsidian API method,
+ *   adds significant complexity without meaningful security benefit given the trust model.
+ *
+ * The Function constructor approach enables:
+ * - Async/await support for vault file operations
+ * - Context injection (app, tag, args, element, frontmatter)
+ * - Full Obsidian API access for script capabilities
+ * - Compatibility with existing user script patterns
+ *
+ * See SECURITY.md for comprehensive security analysis and threat model documentation.
+ *
  * Users should be aware that:
  * - Scripts have full access to the Obsidian API and can read/write vault files
  * - Scripts from untrusted sources should not be added to the vault
@@ -80,7 +106,8 @@ export class ScriptLoaderService implements IScriptLoader {
             `;
 
             // Use Function constructor to dynamically load user script
-            // This is intentional - see class-level security documentation
+            // This is intentional - see class-level security documentation and SECURITY.md
+            // eslint-disable-next-line no-new-func
             const scriptFunction = new Function(wrappedScript)();
             logger.logCacheOperation('Script function created', { script: scriptPath });
 

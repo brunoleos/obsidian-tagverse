@@ -109,7 +109,7 @@ export class LivePreviewCodeMirrorExtension {
                 const context: MatchContext = {
                     tag,
                     args,
-                    isLivePreview: isLivePreview as boolean,
+                    isLivePreview,
                     cursorInside,
                     position: pos,
                     cursor

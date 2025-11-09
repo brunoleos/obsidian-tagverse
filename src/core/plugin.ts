@@ -182,7 +182,7 @@ export default class TagversePlugin extends Plugin {
                             Logger.debug('PLUGIN-COMMAND', 'Manual refresh command executed');
                             await this.refreshActiveView();
                             new Notice('Tagverses refreshed');
-                            Logger.info('PLUGIN-COMMAND', 'Manual refresh completed');
+                            Logger.debug('PLUGIN-COMMAND', 'Manual refresh completed');
                         });
                     }
                 });
@@ -199,14 +199,14 @@ export default class TagversePlugin extends Plugin {
                                 Logger.debug('PLUGIN-COMMAND', 'Script cache cleared');
                             });
                             new Notice('Script cache cleared');
-                            Logger.info('PLUGIN-COMMAND', 'Cache clear completed');
+                            Logger.debug('PLUGIN-COMMAND', 'Cache clear completed');
                         });
                     }
                 });
                 Logger.debug('PLUGIN-INIT', 'Commands registered');
             });
 
-            Logger.info('PLUGIN-INIT', 'Plugin loaded successfully');
+            Logger.debug('PLUGIN-INIT', 'Plugin loaded successfully');
         }); // Auto-flushes here
     }
 
@@ -214,7 +214,7 @@ export default class TagversePlugin extends Plugin {
         setPluginInstance(null);
         this.scriptLoader.clearCache();
 
-        Logger.info('PLUGIN-INIT', 'Plugin unloaded successfully');
+        Logger.debug('PLUGIN-INIT', 'Plugin unloaded successfully');
     }
 
     /**
@@ -264,7 +264,7 @@ export default class TagversePlugin extends Plugin {
             // Refresh active view
             await this.refreshActiveView();
 
-            Logger.info('PLUGIN-SETTINGS', 'Settings change handling completed');
+            Logger.debug('PLUGIN-SETTINGS', 'Settings change handling completed');
         });
     }
 
@@ -279,7 +279,7 @@ export default class TagversePlugin extends Plugin {
 
                 // Check if mode changed
                 if (this.lastActiveViewMode !== null && this.lastActiveViewMode !== currentMode) {
-                    Logger.info('PLUGIN-EVENT', `Mode change detected: ${this.lastActiveViewMode} -> ${currentMode}`);
+                    Logger.debug('PLUGIN-EVENT', `Mode change detected: ${this.lastActiveViewMode} -> ${currentMode}`);
                     await this.refreshActiveView();
                 }
 
@@ -320,7 +320,7 @@ export default class TagversePlugin extends Plugin {
                     }
                 }
             }
-            Logger.info('PLUGIN-EVENT', 'Tag refresh completed');
+            Logger.debug('PLUGIN-EVENT', 'Tag refresh completed');
         });
     }
 

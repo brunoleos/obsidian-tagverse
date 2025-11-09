@@ -208,7 +208,6 @@ export class TagverseSettingTab extends PluginSettingTab {
             .setDesc('Set the verbosity of logging. Default is error.')
             .addDropdown(dropdown => dropdown
                 .addOption('debug', 'Debug')
-                .addOption('info', 'Info')
                 .addOption('warning', 'Warning')
                 .addOption('error', 'Error')
                 .setValue(this.plugin.settings.logLevel)

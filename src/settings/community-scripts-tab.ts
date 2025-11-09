@@ -205,7 +205,7 @@ export class CommunityScriptsTab {
                         updateBtn.setText('Updating...');
                         try {
                             await this.handleUpdate(script.id, updateBtn);
-                            Logger.info( 'COMMUNITY-UI', 'Script update completed', { scriptId: script.id });
+                            Logger.debug( 'COMMUNITY-UI', 'Script update completed', { scriptId: script.id });
                         } catch (error) {
                             updateBtn.disabled = false;
                             updateBtn.setText(`Update to v${script.version}`);
@@ -226,7 +226,7 @@ export class CommunityScriptsTab {
                     uninstallBtn.setText('Uninstalling...');
                     try {
                         await this.handleUninstall(script.id, uninstallBtn);
-                        Logger.info( 'COMMUNITY-UI', 'Script uninstall completed', { scriptId: script.id });
+                        Logger.debug( 'COMMUNITY-UI', 'Script uninstall completed', { scriptId: script.id });
                     } catch (error) {
                         uninstallBtn.disabled = false;
                         uninstallBtn.setText('Uninstall');
@@ -249,7 +249,7 @@ export class CommunityScriptsTab {
 
                     try {
                         await this.handleInstall(script.id, installBtn);
-                        Logger.info( 'COMMUNITY-UI', 'Script install completed', { scriptId: script.id });
+                        Logger.debug( 'COMMUNITY-UI', 'Script install completed', { scriptId: script.id });
                     } catch (error) {
                         // Re-enable button on error
                         installBtn.disabled = false;
@@ -266,7 +266,7 @@ export class CommunityScriptsTab {
             Logger.withScope('📖 View Script Details', () => {
                 Logger.debug( 'COMMUNITY-UI', 'Details button clicked', { scriptId: script.id, url: script.urls.readme });
                 window.open(script.urls.readme, '_blank');
-                Logger.info( 'COMMUNITY-UI', 'Script details opened in browser', { scriptId: script.id });
+                Logger.debug( 'COMMUNITY-UI', 'Script details opened in browser', { scriptId: script.id });
             });
         });
     }

@@ -44,7 +44,7 @@ export class SettingsService implements ISettingsService {
                 });
             });
 
-            Logger.info('SETTINGS', 'Settings saved', {
+            Logger.debug('SETTINGS', 'Settings saved', {
                 mappingCount: settings.tagMappings.length,
                 logLevel: settings.logLevel
             });
@@ -78,7 +78,7 @@ export class SettingsService implements ISettingsService {
                 });
             });
 
-            Logger.info('SETTINGS', 'Settings loaded', {
+            Logger.debug('SETTINGS', 'Settings loaded', {
                 mappingCount: this.settings.tagMappings.length,
                 refreshOnFileChange: this.settings.refreshOnFileChange,
                 logLevel: this.settings.logLevel

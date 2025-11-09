@@ -271,7 +271,7 @@ export class ReadingModeRenderer extends TagRenderer {
 
             // Log page render completion if any tags were rendered
             if (renderedCount > 0) {
-                Logger.info('RENDER-READING', 'Page rendered successfully', {
+                Logger.debug('RENDER-READING', 'Page rendered successfully', {
                     tagCount: renderedCount,
                     sourcePath: context.sourcePath
                 });

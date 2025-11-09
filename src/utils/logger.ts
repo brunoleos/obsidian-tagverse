@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 
 // ========== Types ==========
 
-export type LogCategory = 'debug' | 'info' | 'warning' | 'error';
+export type LogCategory = 'debug' | 'warning' | 'error';
 
 export interface LoggerOptions {
     showNoticeOnError?: boolean;
@@ -81,10 +81,6 @@ class LoggerUtils {
                     const userMessage = LoggerUtils.formatUserMessage(component, event);
                     new Notice(`⚠️ ${userMessage}\nCheck console for details.`, 5000);
                 }
-                break;
-            case 'info':
-                // Use console.debug for info level (only warn/error/debug allowed by Obsidian)
-                console.debug(message, data || '');
                 break;
             case 'debug':
             default:
@@ -228,13 +224,6 @@ export class Logger {
     }
 
     /**
-     * Log an info message
-     */
-    public static info(component: string, event: string, data?: unknown): void {
-        Logger.emitLog('info', component, event, data);
-    }
-
-    /**
      * Log a warning message
      */
     public static warn(component: string, event: string, data?: unknown): void {
@@ -334,7 +323,7 @@ export class Logger {
      * Check if a log level should be logged based on current config level
      */
     private static shouldLog(level: LogCategory): boolean {
-        const levels: LogCategory[] = ['debug', 'info', 'warning', 'error'];
+        const levels: LogCategory[] = ['debug', 'warning', 'error'];
         return levels.indexOf(level) >= levels.indexOf(LoggerConfig.logLevel);
     }
 }

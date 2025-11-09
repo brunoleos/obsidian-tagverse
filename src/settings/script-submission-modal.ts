@@ -150,7 +150,7 @@ export class ScriptSubmissionModal extends Modal {
                 Logger.debug( 'SUBMISSION-UI', 'Submit button clicked');
                 await Logger.withScope('🔄 Process Submission', async () => {
                     await this.generateSubmission();
-                    Logger.info( 'SUBMISSION-UI', 'Submission generation completed');
+                    Logger.debug( 'SUBMISSION-UI', 'Submission generation completed');
                 });
             });
         });

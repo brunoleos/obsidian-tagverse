@@ -64,8 +64,8 @@ class LoggerUtils {
     /**
      * Unified console output method
      */
-    public static outputToConsole(level: LogCategory, component: string, event: string, data: unknown): void {
-        const message = `[TAGVERSE] ${component} | ${event}`;
+    public static outputToConsole(level: LogCategory, component: string, event: string, data: unknown, prefix: string = ''): void {
+        const message = `${prefix}[TAGVERSE] ${component} | ${event}`;
 
         switch (level) {
             case 'error':
@@ -137,24 +137,42 @@ class LogScope {
     }
 
     /**
-     * Flush this scope and all children to console recursively.
+     * Flush this scope and all children to console recursively using indentation with arrows.
      * Skips empty scopes (no entries after log level filtering).
      */
-    public flush(): void {
+    public flush(depth: number = 0): void {
         // Skip empty scopes entirely - don't clutter console
         if (!this.hasEntries()) {
             return;
         }
 
-        console.groupCollapsed(this.formatLabel());
+        const indent = '  '.repeat(depth);
+
+        // Output this scope's label with ↓ arrow (except root which has no arrow)
+        if (depth === 0) {
+            console.debug(this.formatLabel());
+        } else {
+            console.debug(indent + '↓ ' + this.formatLabel());
+        }
 
         try {
-            for (const entry of this.entries) {
+            // Filter out empty child scopes
+            const validEntries = this.entries.filter(entry => {
+                if (entry instanceof LogScope) {
+                    return entry.hasEntries();
+                }
+                return true; // Log entries are always valid
+            });
+
+            // Render each entry with indentation
+            for (const entry of validEntries) {
                 try {
                     if (entry instanceof LogScope) {
-                        entry.flush(); // Recursive flush (child will check hasEntries)
+                        // Recursively flush child scope with increased depth
+                        entry.flush(depth + 1);
                     } else {
-                        this.flushLogEntry(entry);
+                        // Output log entry with indentation
+                        this.flushLogEntry(entry, '  '.repeat(depth + 1));
                     }
                 } catch (err) {
                     console.error('[Logger] Failed to flush entry:', err);
@@ -163,8 +181,6 @@ class LogScope {
         } catch (err) {
             console.error('[Logger] Critical flush failure:', err);
         }
-
-        console.groupEnd();
     }
 
     // ========== Private Methods ==========
@@ -201,9 +217,9 @@ class LogScope {
         return `[TAGVERSE] ${time} | ${this.label}`;
     }
 
-    private flushLogEntry(entry: LogEntry): void {
-        // Use unified console output method
-        LoggerUtils.outputToConsole(entry.type, entry.component, entry.event, entry.data);
+    private flushLogEntry(entry: LogEntry, prefix: string = ''): void {
+        // Use unified console output method with tree prefix
+        LoggerUtils.outputToConsole(entry.type, entry.component, entry.event, entry.data, prefix);
     }
 }
 
